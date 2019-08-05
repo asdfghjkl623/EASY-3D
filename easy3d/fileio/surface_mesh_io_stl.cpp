@@ -105,10 +105,7 @@ namespace easy3d {
 
 			// open file (in ASCII mode)
 			FILE* in = fopen(file_name.c_str(), "r");
-            if (!in) {
-                std::cerr << "could not open file \'" << file_name << "\'" << std::endl;
-                return false;
-            }
+			if (!in) return false;
 
 
 			// ASCII or binary STL?
@@ -230,7 +227,7 @@ namespace easy3d {
 
 		//-----------------------------------------------------------------------------
 
-        // currently we save in ASCII format
+
 		bool save_stl(const std::string& file_name, const SurfaceMesh* mesh)
 		{
 			if (!mesh) {
@@ -253,11 +250,6 @@ namespace easy3d {
 			}
 
 			std::ofstream ofs(file_name.c_str());
-            if (ofs.fail()) {
-                std::cerr << "could not open file \'" << file_name << "\'" << std::endl;
-                return false;
-            }
-
 			auto points = mesh->get_vertex_property<vec3>("v:point");
 
 			ofs << "solid stl" << std::endl;

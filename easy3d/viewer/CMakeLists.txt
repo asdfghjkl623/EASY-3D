@@ -6,6 +6,7 @@ project(${PROJECT_NAME})
 
 set(${PROJECT_NAME}_HEADERS
     ambient_occlusion.h
+    ambient_occlusion_hbao.h
     average_color_blending.h
     camera.h
     constraint.h
@@ -29,6 +30,7 @@ set(${PROJECT_NAME}_HEADERS
     shadow.h
     soft_shadow.h
     opengl_timer.h
+    texture.h
     transform.h
     transform_decompose.h
     transparency.h
@@ -38,6 +40,7 @@ set(${PROJECT_NAME}_HEADERS
 
 set(${PROJECT_NAME}_SOURCES
     ambient_occlusion.cpp
+    ambient_occlusion_hbao.cpp
     average_color_blending.cpp
     camera.cpp
     constraint.cpp
@@ -60,10 +63,26 @@ set(${PROJECT_NAME}_SOURCES
     shadow.cpp
     soft_shadow.cpp
     opengl_timer.cpp
+#    texture.cpp
     transform.cpp
     transform_decompose.cpp
     vertex_array_object.cpp
     viewer.cpp
+    )
+
+
+set(${PROJECT_NAME}_SHADERS
+    ../../resource/shaders/HBAO+/blur.fs
+    ../../resource/shaders/HBAO+/deinter.fs
+    ../../resource/shaders/HBAO+/depthlinearize.fs
+    ../../resource/shaders/HBAO+/fullscreenquad.vs
+    ../../resource/shaders/HBAO+/fullscreenquad.gs
+    ../../resource/shaders/HBAO+/hbao.fs
+    ../../resource/shaders/HBAO+/reinter.fs
+    ../../resource/shaders/HBAO+/scene.fs
+    ../../resource/shaders/HBAO+/scene.vs
+    ../../resource/shaders/HBAO+/ssao.fs
+    ../../resource/shaders/HBAO+/viewnormal.fs
     )
 	
 add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SHADERS} )
@@ -75,7 +94,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glew_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glfw_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glog_INCLUDE_DIR})
 
-target_link_libraries(${PROJECT_NAME} glew glfw core util fileio tinyfiledialogs)
+target_link_libraries(${PROJECT_NAME} glew glfw glog core util fileio tinyfiledialogs)
 
 
 if (MSVC)

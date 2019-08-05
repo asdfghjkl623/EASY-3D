@@ -5,10 +5,11 @@ project(${PROJECT_NAME})
 
 
 set(${PROJECT_NAME}_HEADERS
+    chrono_watch.h
     dialogs.h
     file.h
     line_stream.h
-    chrono_watch.h
+    logging.h
     stop_watch.h
     string.h
     thread.h
@@ -29,7 +30,9 @@ add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "Easy3D")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glog_INCLUDE_DIR})
+
+#set(GLOG_INCLUDE_DIR  ${EASY3D_THIRD_PARTY}/glog/src ${EASY3D_INCLUDE_DIR}/3rd_party)
+#target_include_directories(${PROJECT_NAME} PRIVATE ${GLOG_INCLUDE_DIR})
 
 find_package(Threads REQUIRED)
 target_link_libraries(${PROJECT_NAME} Threads::Threads)

@@ -693,20 +693,16 @@ namespace easy3d {
 				model_idx_ = -1;
 			else
 				model_idx_ = int((model_idx_ - 1 + models_.size()) % models_.size());
-            if (model_idx_ >= 0) {
-                fit_screen(models_[model_idx_]);
+			if (model_idx_ >= 0)
 				std::cout << "current model: " << model_idx_ << ", " << models_[model_idx_]->name() << std::endl;
-            }
 		}
 		else if (key == GLFW_KEY_PERIOD && modifiers == 0) {
 			if (models_.empty())
 				model_idx_ = -1;
 			else
 				model_idx_ = int((model_idx_ + 1) % models_.size());
-            if (model_idx_ >= 0) {
-                fit_screen(models_[model_idx_]);
+			if (model_idx_ >= 0)
 				std::cout << "current model: " << model_idx_ << ", " << models_[model_idx_]->name() << std::endl;
-            }
 		}
         else if (key == GLFW_KEY_DELETE && modifiers == 0) {
             if (current_model())
@@ -1040,7 +1036,7 @@ namespace easy3d {
             if (colors)
                 surface->update_color_buffer(vertex_colors);
             surface->release_index_buffer();
-#else   // smooth shading
+#else
             auto points = mesh->get_vertex_property<vec3>("v:point");
             surface->update_vertex_buffer(points.vector());
             auto colors = mesh->get_vertex_property<vec3>("v:color");
@@ -1318,6 +1314,7 @@ namespace easy3d {
 			draw_corner_axes();
 
         if (show_pivot_point_) {
+
             ShaderProgram* program = ShaderManager::get_program("lines_color");
             if (!program) {
                 std::vector<ShaderProgram::Attribute> attributes;

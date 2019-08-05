@@ -274,10 +274,7 @@ namespace easy3d {
 
 			// open file (in ASCII mode)
 			FILE* in = fopen(file_name.c_str(), "r");
-            if (!in) {
-                std::cerr << "could not open file \'" << file_name << "\'" << std::endl;
-                return false;
-            }
+			if (!in) return false;
 
 			// read header: [ST][C][N][4][n]OFF BINARY
 			char *c = fgets(line, 200, in);
@@ -332,10 +329,8 @@ namespace easy3d {
 			}
 
 			FILE* out = fopen(file_name.c_str(), "w");
-            if (!out) {
-                std::cerr << "could not open file \'" << file_name << "\'" << std::endl;
+			if (!out)
 				return false;
-            }
 
 			bool  has_normals = false;
 			bool  has_texcoords = false;

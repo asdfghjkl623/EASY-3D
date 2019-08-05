@@ -28,6 +28,8 @@
 #include <easy3d/fileio/ply_reader_writer.h>
 #include <easy3d/core/surface_mesh.h>
 
+#include <easy3d/util/logging.h>
+
 
 
 namespace easy3d {
@@ -58,7 +60,7 @@ namespace easy3d {
 				for (const auto& p : properties) {
                     std::string name = p.name;
 					if (p.size() != mesh->vertices_size()) {
-                        std::cerr << "vertex property size (" << p.size() << ") does not match number of vertices (" << mesh->vertices_size() << ")" << std::endl;
+						LOG(WARNING) << "vertex property size (" << p.size() << ") does not match number of vertices (" << mesh->vertices_size() << ")";
 						continue;
 					}
 					if (name.find("v:") == std::string::npos)
@@ -75,7 +77,7 @@ namespace easy3d {
 				for (const auto& p : properties) {
                     std::string name = p.name;
 					if (p.size() != mesh->faces_size()) {
-                        std::cerr << "face property size (" << p.size() << ") does not match number of faces (" << mesh->faces_size() << ")" << std::endl;
+						LOG(WARNING) << "face property size (" << p.size() << ") does not match number of faces (" << mesh->faces_size() << ")";
 						continue;
 					}
 					if (name.find("f:") == std::string::npos)
@@ -92,7 +94,7 @@ namespace easy3d {
 				for (const auto& p : properties) {
                     std::string name = p.name;
 					if (p.size() != mesh->edges_size()) {
-                        std::cerr << "edge property size (" << p.size() << ") does not match number of edges (" << mesh->edges_size() << ")" << std::endl;
+						LOG(WARNING) << "edge property size (" << p.size() << ") does not match number of edges (" << mesh->edges_size() << ")";
 						continue;
 					}
 					if (name.find("e:") == std::string::npos)

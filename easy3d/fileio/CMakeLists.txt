@@ -35,9 +35,12 @@ add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "Easy3D")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glog_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_lastools_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_rply_INCLUDE_DIR})
+
+set(LASTOOLS_INCLUDE_DIR ${EASY3D_THIRD_PARTY}/LAStools/LASzip/src ${EASY3D_THIRD_PARTY}/LAStools/LASlib/inc)
+target_include_directories(${PROJECT_NAME} PRIVATE ${LASTOOLS_INCLUDE_DIR})
+
+set(GLOG_INCLUDE_DIR  ${EASY3D_THIRD_PARTY}/glog/src ${EASY3D_INCLUDE_DIR}/3rd_party/glog)
+target_include_directories(${PROJECT_NAME} PRIVATE ${GLOG_INCLUDE_DIR})
 
 target_link_libraries(${PROJECT_NAME} core LAStools rply)
 
