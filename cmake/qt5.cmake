@@ -52,7 +52,7 @@ if ( QT5_ROOT_PATH )
 endif()
 
 # find qt5 components
-find_package(Qt5 COMPONENTS Core Gui OpenGL Widgets QUIET)
+find_package(Qt5 COMPONENTS Core Gui OpenGL Widgets)
 # or
 # find_package(Qt5Core QUIET)
 # find_package(Qt5Gui QUIET)
