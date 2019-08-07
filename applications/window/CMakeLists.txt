@@ -19,7 +19,7 @@ set(${PROJECT_NAME}_SOURCES
 
 add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_HEADERS})
 
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "Applications")
+set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "applications")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glew_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glfw_INCLUDE_DIR})

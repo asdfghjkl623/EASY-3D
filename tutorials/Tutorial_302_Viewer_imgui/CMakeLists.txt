@@ -16,7 +16,7 @@ set(${PROJECT_NAME}_SOURCES
 
 add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_HEADERS})
 
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "Tutorials")
+set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "tutorials")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glew_INCLUDE_DIR})
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glfw_INCLUDE_DIR})

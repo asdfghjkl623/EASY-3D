@@ -28,7 +28,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#ifdef HAS_QT5
 
 #include <QDir>
 #include <QTime>
@@ -98,13 +97,3 @@ int main(int argc, char *argv[])
 
     return status;
 }
-
-#else
-
-int main(int argc, char *argv[])
-{
-    std::cerr << "The ViewerQt example requires Qt5 which is not availabe/found on this machine" << std::endl;
-    return false;
-}
-
-#endif

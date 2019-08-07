@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.1)
 get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 project(${PROJECT_NAME})
 
-include( cmake/qt5.cmake )
+include( ../../cmake/qt5.cmake )
 if (NOT QT5_FOUND)
 	return ()
 endif ()
@@ -59,7 +59,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glog_INCLUDE_DIR})
 target_link_libraries( ${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL )
 target_link_libraries( ${PROJECT_NAME} viewer)
 
-set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "Tutorials")
+set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "tutorials")
 
 ## Note: On macOS, high-DPI support is enabled by settings in the Info.plist file. Make sure they are present.
 ## For more information, see: http://doc.qt.io/qt-5/highdpi.html
