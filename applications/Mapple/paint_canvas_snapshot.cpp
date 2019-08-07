@@ -98,7 +98,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
 #endif
 
 #ifdef SHOW_PROGRESS
-    QProgressDialog progress("Snapshot...", "Cancel", 0, nbX*nbY, nullptr, Qt::SplashScreen);
+    QProgressDialog progress("Snapshot...", "Cancel", 0, nbX*nbY, this, Qt::SplashScreen);
     progress.setWindowModality(Qt::WindowModal);
     progress.setAutoClose(false);
     progress.setAutoReset(false);
