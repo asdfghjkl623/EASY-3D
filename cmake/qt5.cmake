@@ -39,9 +39,9 @@
 
 # we will use cmake autouic/automoc/autorcc features
 set(CMAKE_AUTOUIC ON)
-set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOMOC ON)  # Tell CMake to run moc when necessary
 set(CMAKE_AUTORCC ON)
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON) # As moc files are generated in the binary dir, tell CMake to always look for includes there
 
 set( QT5_ROOT_PATH CACHE PATH "Qt5 root directory (i.e. where the 'bin' folder lies)" )
 if ( QT5_ROOT_PATH )
@@ -49,38 +49,38 @@ if ( QT5_ROOT_PATH )
 endif()
 
 # find qt5 components
-# find_package(Qt5 COMPONENTS Core Gui OpenGL Widgets REQUIRED)
-find_package(Qt5Core REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5OpenGL REQUIRED)
-find_package(Qt5Widgets REQUIRED)
+find_package(Qt5 COMPONENTS Core Gui OpenGL Widgets QUIET)
+# or
+# find_package(Qt5Core QUIET)
+# find_package(Qt5Gui QUIET)
+# find_package(Qt5OpenGL QUIET)
+# find_package(Qt5Widgets QUIET)
 
-# in the case no Qt5Config.cmake file could be found, cmake will explicitly ask the user for the QT5_DIR containing it!
-# thus no need to keep additional variables and checks
+# In the case no Qt5Config.cmake file could be found, cmake will explicitly ask the user for the QT5_DIR containing it!
 
-# Starting with the QtCore lib, find the bin and root directories
-get_target_property(QT5_LIB_LOCATION Qt5::Core LOCATION_${CMAKE_BUILD_TYPE})
-get_filename_component(QT_BINARY_DIR ${QT5_LIB_LOCATION} DIRECTORY)
-
-# Apple uses frameworks - move up until we get to the base directory to set the bin directory properly
-if ( APPLE )
-	get_filename_component(QT_BINARY_DIR ${QT_BINARY_DIR} DIRECTORY)
-	set(QT_BINARY_DIR "${QT_BINARY_DIR}/bin")	
-
-	set( MACDEPLOYQT "${QT_BINARY_DIR}/macdeployqt" )
+if (Qt5Core_FOUND AND Qt5Gui_FOUND AND Qt5OpenGL_FOUND AND Qt5Widgets_FOUND)
+  set(QT5_FOUND TRUE)
 endif()
 
-# set QT5_ROOT_PATH if it wasn't set by the user
-if ( NOT QT5_ROOT_PATH )
-	get_filename_component(QT5_ROOT_PATH ${QT_BINARY_DIR} DIRECTORY)
+if (QT5_FOUND)
+	# Starting with the QtCore lib, find the bin and root directories
+	get_target_property(QT5_LIB_LOCATION Qt5::Core LOCATION_${CMAKE_BUILD_TYPE})
+	get_filename_component(QT_BINARY_DIR ${QT5_LIB_LOCATION} DIRECTORY)
+
+	# Apple uses frameworks - move up until we get to the base directory to set the bin directory properly
+	if ( APPLE )
+		get_filename_component(QT_BINARY_DIR ${QT_BINARY_DIR} DIRECTORY)
+		set(QT_BINARY_DIR "${QT_BINARY_DIR}/bin")	
+
+		set( MACDEPLOYQT "${QT_BINARY_DIR}/macdeployqt" )
+	endif()
+
+	# set QT5_ROOT_PATH if it wasn't set by the user
+	if ( NOT QT5_ROOT_PATH )
+		get_filename_component(QT5_ROOT_PATH ${QT_BINARY_DIR} DIRECTORY)
+	endif()
+
+	# turn on QStringBuilder for more efficient string construction
+	#	see https://doc.qt.io/qt-5/qstring.html#more-efficient-string-construction
+	add_definitions( -DQT_USE_QSTRINGBUILDER )
 endif()
-
-include_directories(${Qt5OpenGL_INCLUDE_DIRS}
-                    ${Qt5Widgets_INCLUDE_DIRS}
-                    ${Qt5Core_INCLUDE_DIRS}
-                    ${Qt5Gui_INCLUDE_DIRS}
-                   )
-
-# turn on QStringBuilder for more efficient string construction
-#	see https://doc.qt.io/qt-5/qstring.html#more-efficient-string-construction
-add_definitions( -DQT_USE_QSTRINGBUILDER )
