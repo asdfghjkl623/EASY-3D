@@ -34,9 +34,9 @@
 #           add_executable(${PROJECT_NAME}, main.cpp)
 # -) specify the Qt libraries to link against, e.g.,
 #           target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
-#    The recommended way to use Qt libraries and headers with CMake is to use the target_link_libraries command. 
-#	 This command automatically adds appropriate include directories, compile definitions, the position-independent-code flag, 
-#	 and links to the qtmain.lib library on Windows.
+#    The recommended way to use Qt libraries and headers with CMake is to use the target_link_libraries
+#    command. This command automatically adds appropriate include directories, compile definitions, the
+#    position-independent-code flag, and links to the qtmain.lib library on Windows.
 # ------------------------------------------------------------------------------
 
 
