@@ -36,9 +36,7 @@ The amount of 3D data has been explosively increasing in the past decades, drive
 
 - Step-by-step tutorials to get acquainted with the data structures, rendering techniques, and algorithms for 3D modeling and geometry processing.
 
-- A viewer that can be used directly to visualize 3D scenes in various formats, which can also be easily extended.
-
-- A handy tool *Mapple* created out of the *Easy3D* library for rendering and processing 3D data.
+- A viewer that can be used directly to visualize 3D scenes in various formats, which can also be easily extended. A handy tool *Mapple* created out of the *Easy3D* library for rendering and processing 3D data.
 
 *Easy3D* was initially designed with an intention for research and educational purposes, while its wide range of features also enables developing sophisticated 3D applications. *Easy3D* has been widely used by graduate students in courses and thesis projects and has enabled a number of scientific publications, e.g., @adtree:2019 and @adqsm:2020.
 
