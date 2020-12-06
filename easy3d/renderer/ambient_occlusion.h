@@ -89,6 +89,18 @@ namespace easy3d {
         AmbientOcclusion& operator=(const AmbientOcclusion&);
     };
 
+
+    /**
+     * \example Tutorial_501_AmbientOcclusion
+     * The source file containing the main() function:
+     * \include Tutorial_501_AmbientOcclusion/main.cpp
+     * The header file of the class:
+     * \include Tutorial_501_AmbientOcclusion/viewer.h
+     * The source file of the class:
+     * \include Tutorial_501_AmbientOcclusion/viewer.cpp
+     */
+
+
 } // namespace easy3d
 
 
