@@ -36,6 +36,7 @@ namespace easy3d {
     class SurfaceMesh;
 
     /// \brief Generate a 3D surface mesh from a text string.
+    /// \class TextMesher easy3d/algo/text_mesher.h
     class TextMesher {
     public:
         /**
@@ -144,9 +145,6 @@ namespace easy3d {
         // vertices. Suggested value is 4.
         unsigned short bezier_steps_;
     };
-
-
-    /// @example Tutorial_310_TextMesher    \include Tutorial_310_TextMesher/main.cpp
 
 }
 

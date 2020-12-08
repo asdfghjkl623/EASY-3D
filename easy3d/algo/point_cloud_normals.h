@@ -34,6 +34,7 @@ namespace easy3d {
 
     /// \brief Estimate point cloud normals. It also allows to reorients the point cloud normals based on a minimum
     /// spanning tree algorithm.
+    /// \class PointCloudNormals easy3d/algo/point_cloud_normals.h
     class PointCloudNormals {
     public:
         /// \brief Estimates the point cloud normals using PCA.
@@ -48,16 +49,6 @@ namespace easy3d {
         bool reorient(PointCloud *cloud, unsigned int k = 16) const;
     };
 
-
-    /**
-     * \example Tutorial_601_Cloud_NormalEstimation
-     * The source file containing the main() function:
-     * \include Tutorial_601_Cloud_NormalEstimation/main.cpp
-     * The header file of the class:
-     * \include Tutorial_601_Cloud_NormalEstimation/viewer.h
-     * The source file of the class:
-     * \include Tutorial_601_Cloud_NormalEstimation/viewer.cpp
-     */
 
 } // namespace easy3d
 

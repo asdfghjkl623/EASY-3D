@@ -34,6 +34,11 @@ namespace easy3d {
     class PointCloud;
     class ShaderProgram;
 
+    /**
+     * \brief Implementation of picking points from a point cloud.
+     * \class PointCloudPicker easy3d/gui/picker_point_cloud.h
+     * \see Picker, ModelPicker, SurfaceMeshPicker
+     */
     class PointCloudPicker : public Picker {
     public:
         PointCloudPicker(const Camera *cam);
@@ -63,17 +68,6 @@ namespace easy3d {
         int pick_vertices_cpu(PointCloud *model, const Polygon2 &plg, bool deselect);
         int pick_vertices_gpu(PointCloud *model, const Polygon2 &plg, bool deselect, ShaderProgram *program);
     };
-
-
-    /**
-     * \example Tutorial_403_PointSelection
-     * The source file containing the main() function:
-     * \include Tutorial_403_PointSelection/main.cpp
-     * The header file of the class:
-     * \include Tutorial_403_PointSelection/viewer.h
-     * The source file of the class:
-     * \include Tutorial_403_PointSelection/viewer.cpp
-     */
 
 }
 

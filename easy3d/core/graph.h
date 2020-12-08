@@ -39,8 +39,8 @@ namespace easy3d {
 
 	/**
 	 * @brief A Graph data structure with easy property management.
+	 * \class Graph easy3d/core/graph.h
 	 */
-
 
 	class Graph : public virtual Model
 	{
@@ -922,11 +922,6 @@ namespace easy3d {
 	{
 		return (os << 'e' << e.idx());
 	}
-
-
-    /// @example Tutorial_108_Graph                 \include Tutorial_108_Graph/main.cpp
-    /// @example Tutorial_109_Graph_Connectivity    \include Tutorial_109_Graph_Connectivity/main.cpp
-    /// @example Tutorial_110_Graph_Property        \include Tutorial_110_Graph_Property/main.cpp
 
 } // namespace easy3d
 

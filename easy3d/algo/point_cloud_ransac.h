@@ -34,7 +34,8 @@ namespace easy3d {
 
     class PointCloud;
 
-    /// \brief Extract primitives from point clouds using RANSAC.   \par
+    /// \brief Extract primitives from point clouds using RANSAC.
+    /// \class PrimitivesRansac easy3d/algo/point_cloud_ransac.h
     /// Usage example:
     ///     \code
     ///     PrimitivesRansac ransac;
@@ -91,17 +92,6 @@ namespace easy3d {
     private:
         std::set<PrimType> types_;
     };
-
-
-    /**
-     * \example Tutorial_603_Cloud_PlaneExtraction
-     * The source file containing the main() function:
-     * \include Tutorial_603_Cloud_PlaneExtraction/main.cpp
-     * The header file of the class:
-     * \include Tutorial_603_Cloud_PlaneExtraction/viewer.h
-     * The source file of the class:
-     * \include Tutorial_603_Cloud_PlaneExtraction/viewer.cpp
-     */
 
 }
 
