@@ -232,40 +232,40 @@ namespace easy3d {
 		if (!props.empty())
 		{
             output << "vertex properties:\n";
-			for (unsigned int i = 0; i < props.size(); ++i)
-                output << "\t" << props[i] << std::endl;
+			for (const auto& p : props)
+                output << "\t" << p << std::endl;
 		}
 
 		props = halfedge_properties();
 		if (!props.empty())
 		{
             output << "halfedge properties:\n";
-			for (unsigned int i = 0; i < props.size(); ++i)
-                output << "\t" << props[i] << std::endl;
+            for (const auto& p : props)
+                output << "\t" << p << std::endl;
 		}
 
 		props = edge_properties();
 		if (!props.empty())
 		{
             output<< "edge properties:\n";
-			for (unsigned int i = 0; i < props.size(); ++i)
-                output << "\t" << props[i] << std::endl;
+            for (const auto& p : props)
+                output << "\t" << p << std::endl;
 		}
 
 		props = face_properties();
 		if (!props.empty())
 		{
             output << "face properties:\n";
-			for (unsigned int i = 0; i < props.size(); ++i)
-                output << "\t" << props[i] << std::endl;
+            for (const auto& p : props)
+                output << "\t" << p << std::endl;
 		}
 
 		props = model_properties();
 		if (!props.empty())
 		{
             output << "model properties:\n";
-			for (unsigned int i = 0; i < props.size(); ++i)
-                output << "\t" << props[i] << std::endl;
+            for (const auto& p : props)
+                output << "\t" << p << std::endl;
 		}
     }
 
@@ -301,7 +301,7 @@ namespace easy3d {
             {
                 if (target(h) == end)
                     return h;
-                h = cw_rotated_halfedge(h);
+                h = next_around_source(h);
             }
             while (h != hh);
         }
@@ -363,7 +363,7 @@ namespace easy3d {
                     set_out_halfedge(v, h);
                     return;
                 }
-                h = cw_rotated_halfedge(h);
+                h = next_around_source(h);
             }
             while (h != hh);
         }
@@ -835,20 +835,71 @@ namespace easy3d {
         if (!vnormal_)
             vnormal_ = vertex_property<vec3>("v:normal");
 
-        // TODO: may not stable for concave vertices?
         VertexIterator vit, vend=vertices_end();
-        for (vit=vertices_begin(); vit!=vend; ++vit) {
-            if (!is_border(*vit))
-                vnormal_[*vit] = compute_vertex_normal(*vit);
-            else { // Liangliang: if on border, we use the face normal.
-                auto h = out_halfedge(*vit);
-                if (h.is_valid()) { // might be an isolated vertex
-                    if (is_border(h))
-                        h = opposite(h);
-                    vnormal_[*vit] = compute_face_normal(face(h));
+
+#if 0   // not stable for concave vertices
+        for (vit=vertices_begin(); vit!=vend; ++vit)
+            vnormal_[*vit] = compute_vertex_normal(*vit);
+#else // the angle-weighted average of incident face average
+        
+        auto angle_weighted_face_normals = [this](Vertex v) -> vec3 {
+            vec3     nn(0,0,0);
+            Halfedge  h = out_halfedge(v);
+
+            if (h.is_valid())
+            {
+                const Halfedge hend = h;
+                const vec3& p0 = position(v);
+
+                vec3   n, p1, p2;
+                float  cosine, angle, denom;
+
+                do
+                {
+                    if (!is_border(h))
+                    {
+                        p1 = vpoint_[target(h)];
+                        p1 -= p0;
+
+                        p2 = vpoint_[source(prev(h))];
+                        p2 -= p0;
+
+                        // check whether we can robustly compute angle
+                        denom = sqrt(dot(p1,p1)*dot(p2,p2));
+                        if (denom > std::numeric_limits<float>::min())
+                        {
+                            cosine = dot(p1,p2) / denom;
+                            if      (cosine < -1.0) cosine = -1.0;
+                            else if (cosine >  1.0) cosine =  1.0;
+                            angle = acos(cosine);
+
+                            n   = fnormal_[face(h)];
+
+                            // check whether normal is != 0
+                            denom = norm(n);
+                            if (denom > std::numeric_limits<float>::min())
+                            {
+                                n  *= angle/denom;
+                                nn += n;
+                            }
+                        }
+                    }
+
+                    h  = next_around_source(h);
                 }
+                while (h != hend);
+
+                nn.normalize();
             }
-        }
+
+            return nn;
+        };
+
+        if (!fnormal_)
+            update_face_normals();
+        for (vit=vertices_begin(); vit!=vend; ++vit)
+            vnormal_[*vit] = angle_weighted_face_normals(*vit);
+#endif
     }
 
 
@@ -901,7 +952,7 @@ namespace easy3d {
                     }
                 }
 
-                h  = cw_rotated_halfedge(h);
+                h  = next_around_source(h);
             }
             while (h != hend);
 
