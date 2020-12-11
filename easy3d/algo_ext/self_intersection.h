@@ -80,7 +80,7 @@ namespace easy3d {
          * @param mesh The input mesh. If self intersection exists, it carries the remeshed model. Otherwise it remains
          *             unchanged.
          * @param stitch Stitch the borders
-         * @return true if remesh actually occurred (i.e., self intersection was detected).
+         * @return \c true if remesh actually occurred (i.e., self intersection was detected).
          */
         bool remesh(SurfaceMesh *mesh, bool stitch);
 
@@ -131,7 +131,7 @@ namespace easy3d {
 
         // remove degenerate faces by collapsing tiny length edges.
         // returns the number of faces removed
-        int remove_degenerate_faces(SurfaceMesh *mesh, double coincident_threshold = 1e-4) const;
+        int remove_degenerate_faces(SurfaceMesh *mesh, double coincident_threshold = 1e-5) const;
 
         // test if two triangles intersect
         bool do_intersect(const Triangle &A, const Triangle &B);
