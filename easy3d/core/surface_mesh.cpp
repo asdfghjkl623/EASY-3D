@@ -676,6 +676,21 @@ namespace easy3d {
 
     bool
     SurfaceMesh::
+    is_closed() const
+    {
+        EdgeIterator eit=edges_begin(), eend=edges_end();
+        for (; eit!=eend; ++eit)
+            if (is_border(*eit))
+                return false;
+        return true;
+    }
+
+
+    //-----------------------------------------------------------------------------
+
+
+    bool
+    SurfaceMesh::
     is_triangle_mesh() const
     {
         FaceIterator fit=faces_begin(), fend=faces_end();
@@ -1888,7 +1903,7 @@ namespace easy3d {
 
     void
     SurfaceMesh::
-    garbage_collection()
+    collect_garbage()
     {
         if (!garbage_)
             return;

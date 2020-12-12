@@ -304,7 +304,7 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
                     ++count;
                 }
             }
-            mesh->garbage_collection();
+            mesh->collect_garbage();
             mesh->renderer()->update();
             LOG(INFO) << count << " faces deleted" << std::endl;
         } else if (dynamic_cast<PointCloud*>(currentModel())) {
@@ -317,7 +317,7 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
                     ++count;
                 }
             }
-            cloud->garbage_collection();
+            cloud->collect_garbage();
             cloud->renderer()->update();
             LOG(INFO) << count << " points deleted" << std::endl;
         }
@@ -806,7 +806,7 @@ void PaintCanvas::addModel(Model *model) {
     model->set_renderer(renderer);
 
     models_.push_back(model);
-    model_idx_ = static_cast<int>(models_.size()) - 1; // make the last one current
+//    model_idx_ = static_cast<int>(models_.size()) - 1; // make the last one current
 }
 
 

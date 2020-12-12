@@ -116,19 +116,40 @@
      <addaction name="actionSurfaceMeshSubdivisionCatmullClark"/>
      <addaction name="actionSurfaceMeshSubdivisionSqrt3"/>
     </widget>
+    <widget class="QMenu" name="menuPolygonSoupProcessing">
+     <property name="toolTip">
+      <string>Process surface mesh as a polygon soup</string>
+     </property>
+     <property name="title">
+      <string>Mesh processed as polygon soup</string>
+     </property>
+     <addaction name="actionSurfaceMeshRepairPolygonSoup"/>
+     <addaction name="actionSurfaceMeshStitchPolygonSoup"/>
+    </widget>
+    <widget class="QMenu" name="menuClippingPlane">
+     <property name="title">
+      <string>Clipping plane</string>
+     </property>
+     <addaction name="actionSurfaceMeshClip"/>
+     <addaction name="actionSurfaceMeshSplit"/>
+     <addaction name="actionSurfaceMeshSlice"/>
+    </widget>
     <addaction name="actionTopologyStatistics"/>
     <addaction name="separator"/>
     <addaction name="actionExtractConnectedComponents"/>
     <addaction name="actionPlanarPartition"/>
     <addaction name="separator"/>
+    <addaction name="menuPolygonSoupProcessing"/>
+    <addaction name="separator"/>
+    <addaction name="actionSurfaceMeshRemoveIsolatedVertices"/>
+    <addaction name="actionDetectDuplicateFaces"/>
+    <addaction name="actionRemoveDuplicateFaces"/>
+    <addaction name="separator"/>
+    <addaction name="actionStitchConnectedComponents"/>
+    <addaction name="actionStitchBordersWithoutReorientation"/>
+    <addaction name="separator"/>
     <addaction name="actionOrientSurface"/>
     <addaction name="actionReverseOrientation"/>
-    <addaction name="separator"/>
-    <addaction name="actionSurfaceMeshStitchCoincidentEdges"/>
-    <addaction name="actionSurfaceMeshRemoveIsolatedVertices"/>
-    <addaction name="separator"/>
-    <addaction name="actionDetectDuplicatedFaces"/>
-    <addaction name="actionRemoveDuplicatedFaces"/>
     <addaction name="separator"/>
     <addaction name="actionDetectSelfIntersections"/>
     <addaction name="actionRemeshSelfIntersections"/>
@@ -146,8 +167,9 @@
     <addaction name="actionSurfaceMeshHoleFilling"/>
     <addaction name="actionSurfaceMeshParameterization"/>
     <addaction name="separator"/>
-    <addaction name="actionSamplingSurfaceMesh"/>
+    <addaction name="menuClippingPlane"/>
     <addaction name="separator"/>
+    <addaction name="actionSamplingSurfaceMesh"/>
     <addaction name="actionCreateSurfaceMeshFromText"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
@@ -623,12 +645,12 @@
     <string>Sampling (to a point cloud)</string>
    </property>
   </action>
-  <action name="actionDetectDuplicatedFaces">
+  <action name="actionDetectDuplicateFaces">
    <property name="text">
     <string>Detect duplicate faces</string>
    </property>
   </action>
-  <action name="actionRemoveDuplicatedFaces">
+  <action name="actionRemoveDuplicateFaces">
    <property name="text">
     <string>Remove duplicate faces</string>
    </property>
@@ -860,14 +882,6 @@
     <string>Compute surface mesh curvatures</string>
    </property>
   </action>
-  <action name="actionSurfaceMeshStitchCoincidentEdges">
-   <property name="text">
-    <string>Stitch coincident edges</string>
-   </property>
-   <property name="toolTip">
-    <string>Stitch coincident edges</string>
-   </property>
-  </action>
   <action name="actionSurfaceMeshRemoveIsolatedVertices">
    <property name="text">
     <string>Remove isolated vertices</string>
@@ -898,14 +912,49 @@
     <string>Planar partition</string>
    </property>
   </action>
-  <action name="actionOrientSurface">
+  <action name="actionStitchConnectedComponents">
    <property name="text">
-    <string>Orient surface</string>
+    <string>Stitch connected components</string>
    </property>
   </action>
   <action name="actionReverseOrientation">
    <property name="text">
     <string>Reverse orientation</string>
+   </property>
+  </action>
+  <action name="actionStitchBordersWithoutReorientation">
+   <property name="text">
+    <string>Stitch borders (no reorientation)</string>
+   </property>
+  </action>
+  <action name="actionSurfaceMeshRepairPolygonSoup">
+   <property name="text">
+    <string>Repair polygon soup</string>
+   </property>
+  </action>
+  <action name="actionSurfaceMeshStitchPolygonSoup">
+   <property name="text">
+    <string>Stitch polygon soup</string>
+   </property>
+  </action>
+  <action name="actionOrientSurface">
+   <property name="text">
+    <string>Orient</string>
+   </property>
+  </action>
+  <action name="actionSurfaceMeshClip">
+   <property name="text">
+    <string>Clip</string>
+   </property>
+  </action>
+  <action name="actionSurfaceMeshSplit">
+   <property name="text">
+    <string>Split</string>
+   </property>
+  </action>
+  <action name="actionSurfaceMeshSlice">
+   <property name="text">
+    <string>Slice</string>
    </property>
   </action>
  </widget>
