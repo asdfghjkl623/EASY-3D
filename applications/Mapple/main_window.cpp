@@ -798,20 +798,20 @@ void MainWindow::createActionsForSurfaceMeshMenu() {
     connect(ui->actionSurfaceMeshTriangulation, SIGNAL(triggered()), this, SLOT(surfaceMeshTriangulation()));
 
     connect(ui->actionSurfaceMeshRepairPolygonSoup, SIGNAL(triggered()), this, SLOT(surfaceMeshRepairPolygonSoup()));
-    connect(ui->actionSurfaceMeshStitchPolygonSoup, SIGNAL(triggered()), this, SLOT(surfaceMeshStitchPolygonSoup()));
+    connect(ui->actionSurfaceMeshOrientAndStitchPolygonSoup, SIGNAL(triggered()), this, SLOT(surfaceMeshOrientAndStitchPolygonSoup()));
 
     connect(ui->actionSurfaceMeshClip, SIGNAL(triggered()), this, SLOT(surfaceMeshClip()));
     connect(ui->actionSurfaceMeshSplit, SIGNAL(triggered()), this, SLOT(surfaceMeshSplit()));
     connect(ui->actionSurfaceMeshSlice, SIGNAL(triggered()), this, SLOT(surfaceMeshSlice()));
 
-    connect(ui->actionStitchConnectedComponents, SIGNAL(triggered()), this, SLOT(surfaceMeshStitchConnectedComponents()));
-    connect(ui->actionStitchBordersWithoutReorientation, SIGNAL(triggered()), this, SLOT(surfaceMeshStitchBordersWithoutReorientation()));
+    connect(ui->actionStitchWithReorientation, SIGNAL(triggered()), this, SLOT(surfaceMeshStitchWithReorientation()));
+    connect(ui->actionStitchWithoutReorientation, SIGNAL(triggered()), this, SLOT(surfaceMeshStitchWithoutReorientation()));
 
-    connect(ui->actionOrientSurface, SIGNAL(triggered()), this, SLOT(surfaceMeshOrient()));
+    connect(ui->actionOrientClosedTriangleMesh, SIGNAL(triggered()), this, SLOT(surfaceMeshOrientClosedTriangleMesh()));
     connect(ui->actionReverseOrientation, SIGNAL(triggered()), this, SLOT(surfaceMeshReverseOrientation()));
 
-    connect(ui->actionDetectDuplicateFaces, SIGNAL(triggered()), this, SLOT(surfaceMeshDetectDuplicateFaces()));
-    connect(ui->actionRemoveDuplicateFaces, SIGNAL(triggered()), this, SLOT(surfaceMeshRemoveDuplicateFaces()));
+    connect(ui->actionDetectDuplicateAndFoldingFaces, SIGNAL(triggered()), this, SLOT(surfaceMeshDetectDuplicateAndFoldingFaces()));
+    connect(ui->actionRemoveDuplicateAndFoldingFaces, SIGNAL(triggered()), this, SLOT(surfaceMeshRemoveDuplicateAndFoldingFaces()));
 
     connect(ui->actionDetectSelfIntersections, SIGNAL(triggered()), this, SLOT(surfaceMeshDetectSelfIntersections()));
     connect(ui->actionRemeshSelfIntersections, SIGNAL(triggered()), this, SLOT(surfaceMeshRemeshSelfIntersections()));
@@ -935,7 +935,7 @@ void MainWindow::surfaceMeshRepairPolygonSoup() {
         return;
 
 #if HAS_CGAL
-    Surfacer::repair_polygon_mesh(mesh);
+    Surfacer::repair_polygon_soup(mesh);
 
     mesh->renderer()->update();
     viewer_->update();
@@ -948,12 +948,13 @@ void MainWindow::surfaceMeshRepairPolygonSoup() {
 }
 
 
-void MainWindow::surfaceMeshStitchConnectedComponents() {
+void MainWindow::surfaceMeshStitchWithReorientation() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
 
 #if HAS_CGAL
+    Surfacer::stitch_borders(mesh);
     Surfacer::merge_reversible_connected_components(mesh);
 
     mesh->renderer()->update();
@@ -967,14 +968,13 @@ void MainWindow::surfaceMeshStitchConnectedComponents() {
 }
 
 
-// does the same as surfaceMeshStitchConnectedComponents(), but treats the mesh as a polygon soup
-void MainWindow::surfaceMeshStitchPolygonSoup() {
+void MainWindow::surfaceMeshOrientAndStitchPolygonSoup() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
 
 #if HAS_CGAL
-    Surfacer::merge_reversible_connected_components_2(mesh);
+    Surfacer::orient_and_stitch_polygon_soup(mesh);
 
     mesh->renderer()->update();
     viewer_->update();
@@ -1119,7 +1119,7 @@ void MainWindow::surfaceMeshSlice() {
 }
 
 
-void MainWindow::surfaceMeshStitchBordersWithoutReorientation() {
+void MainWindow::surfaceMeshStitchWithoutReorientation() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
@@ -1138,13 +1138,13 @@ void MainWindow::surfaceMeshStitchBordersWithoutReorientation() {
 }
 
 
-void MainWindow::surfaceMeshOrient() {
+void MainWindow::surfaceMeshOrientClosedTriangleMesh() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
 
 #if HAS_CGAL
-    Surfacer::orient(mesh);
+    Surfacer::orient_closed_triangle_mesh(mesh);
 
     mesh->renderer()->update();
     viewer_->update();
@@ -1193,7 +1193,7 @@ void MainWindow::surfaceMeshRemoveIsolatedVertices() {
 }
 
 
-void MainWindow::surfaceMeshDetectDuplicateFaces() {
+void MainWindow::surfaceMeshDetectDuplicateAndFoldingFaces() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
@@ -1201,17 +1201,20 @@ void MainWindow::surfaceMeshDetectDuplicateFaces() {
 #if HAS_CGAL
     StopWatch w;
     w.start();
-    LOG(INFO) << "detecting duplicate faces...";
+    LOG(INFO) << "detecting overlapping faces...";
 
-    const auto& faces = Surfacer::detect_duplicate_faces(mesh, true);
-    LOG(INFO) << "done. " << faces.size() << " faces deleted. " << w.time_string();
+    std::vector<std::pair<SurfaceMesh::Face, SurfaceMesh::Face> > duplicate_faces;
+    std::vector<std::pair<SurfaceMesh::Face, SurfaceMesh::Face> > folding_faces;
+    Surfacer::detect_overlapping_faces(mesh, duplicate_faces, folding_faces);
+    LOG(INFO) << "done. " << duplicate_faces.size() << " pairs of duplicate faces, " << folding_faces.size()
+              << " pairs of folding faces. " << w.time_string();
 #else
     LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
 #endif
 }
 
 
-void MainWindow::surfaceMeshRemoveDuplicateFaces() {
+void MainWindow::surfaceMeshRemoveDuplicateAndFoldingFaces() {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(viewer()->currentModel());
     if (!mesh)
         return;
@@ -1219,9 +1222,9 @@ void MainWindow::surfaceMeshRemoveDuplicateFaces() {
 #if HAS_CGAL
     StopWatch w;
     w.start();
-	LOG(INFO) << "removing duplicate faces...";
+	LOG(INFO) << "removing overlapping faces...";
 
-    unsigned int num = Surfacer::remove_duplicate_faces(mesh, true);
+    unsigned int num = Surfacer::remove_overlapping_faces(mesh, true);
     if (num > 0) {
         mesh->renderer()->update();
         viewer_->update();

@@ -45,7 +45,7 @@ namespace easy3d {
      *          It allows (re)orientation, detecting and resolving topological issues (e.g., duplicate vertices/faces,
      *          self intersection), and clipping/splitting/slicing of a surface mesh.
      *
-     * \see DuplicateFaces and SelfIntersection.
+     * \see OverlappingFaces and SelfIntersection.
      */
     class Surfacer {
     public:
@@ -62,25 +62,37 @@ namespace easy3d {
         //@{
 
         /**
-         * \brief Stitches connected components of a surface mesh
-         * \details It first reverses the connected components having compatible boundary cycles that could be merged
-         * if their orientation were made compatible. Then, it stitches those with compatible boundaries.
+         * \brief Stitches together border halfedges in a polygon mesh.
          *
-         * Connected components are examined by increasing number of faces.
+         * \details The pairs of halfedges to be stitched are automatically found amongst all border halfedges.
+         * Two border halfedges h1 and h2 can be stitched if the points associated to the source and target vertices
+         * of h1 are the same as those of the target and source vertices of h2 respectively.
          *
-         * \see merge_reversible_connected_components_2()
+         * @return The number of pairs of halfedges that were stitched.
+         *
+         * \see merge_reversible_connected_components
+         */
+        static int stitch_borders(SurfaceMesh *mesh);
+
+        /**
+         * \brief Reverses the connected components having incompatible boundary cycles that could be merged if their
+         * orientation were made compatible, and stitches them. Connected components are examined by increasing number
+         * of faces.
+         *
+         * \attention Stitching occurs only if incompatible boundary cycles exists and the corresponding connected
+         *            components are reversible.
+         *
+         * \see stitch_borders()
          */
         static void merge_reversible_connected_components(SurfaceMesh *mesh);
 
         /**
-         * \brief Stitches connected components of a surface mesh
-         * \details This function has the same goal as merge_reversible_connected_components(). The difference is that
-         * it treats the input mesh as a polygon soup. Internally, it calls
-         * orient_polygon_soup(std::vector<vec3>& points, std::vector<Polygon>& polygons).
-         *
+         * \brief Tries to consistently orient and stitch a mesh (treated as a polygon soup).
+         * \details Internally, it calls
+         *      orient_and_stitch_polygon_soup(std::vector<vec3>& points, std::vector<Polygon>& polygons).
          * \see merge_reversible_connected_components()
          */
-        static bool merge_reversible_connected_components_2(SurfaceMesh *mesh);
+        static bool orient_and_stitch_polygon_soup(SurfaceMesh *mesh);
 
         /**
          * \brief Reverses the orientation of the entire mesh
@@ -92,23 +104,23 @@ namespace easy3d {
          * \pre mesh.is_triangle_mesh(), mesh.is_closed()
          * @param mesh The input mesh.
          */
-        static void orient(SurfaceMesh *mesh);
+        static void orient_closed_triangle_mesh(SurfaceMesh *mesh);
 
         /**
-         * \brief Tries to consistently orient a polygon soup.
+         * \brief Tries to consistently orient and stitch a polygon soup.
          * \details When it is not possible to produce a combinatorial manifold surface, some points are duplicated.
-         * It also builds a polygon mesh if the oriented soup of polygons describes a consistently oriented polygon
-         * mesh. The algorithm is described in
+         *
+         * The algorithm is described in
          *   - A.Guéziec, et al. Cutting and stitching: Converting sets of polygons to manifold surfaces. TVCG 2001.
          *
          * \param points Points of the soup of polygons. Some additional points might be pushed back to resolve
          *        non-manifoldness or non-orientability issues.
-         * \param polygons Each element in the vector describes a polygon using the index of the points in points.
+         * \param polygons Each element describes a polygon represented by the index of its vertices in \p points.
          *        If needed the order of the indices of a polygon might be reversed.
          * \return \c true if the orientation operation succeeded. \c false if some points were duplicated, thus
          *         producing a self-intersecting polyhedron.
          */
-        static bool orient_polygon_soup(std::vector<vec3> &points, std::vector<Polygon> &polygons);
+        static bool orient_and_stitch_polygon_soup(std::vector<vec3> &points, std::vector<Polygon> &polygons);
 
         /**
          * \brief Repairs a given polygon soup through various repairing operations.
@@ -140,34 +152,45 @@ namespace easy3d {
          * \note The point and face containers will be modified by the repairing operations, and thus the indexation
          * of the polygons will also be changed.
          */
-        static void repair_polygon_mesh(SurfaceMesh *mesh);
+        static void repair_polygon_soup(SurfaceMesh *mesh);
 
-
-        /**
-         * \brief Stitches together border halfedges in a polygon mesh.
-         * \details The pairs of halfedges to be stitched are automatically found amongst all border halfedges.
-         * Two border halfedges h1 and h2 can be stitched if the points associated to the source and target vertices
-         * of h1 are the same as those of the target and source vertices of h2 respectively.
-         * @return The number of pairs of halfedges that were stitched.
-         */
-        static int stitch_borders(SurfaceMesh *pmesh);
         //@}
 
 
         /// \name Duplicate faces
         //@{
 
-        /// \brief Detects duplicate faces.
-        /// @param exact True: do exact predict; otherwise use the distance threshold.
-        /// \return The set of duplicate faces, where the \c second of each entry contains the set of faces
-        /// duplicating the \c first.
-        static std::vector<std::pair<SurfaceMesh::Face, std::vector<SurfaceMesh::Face> > >
-        detect_duplicate_faces(SurfaceMesh *mesh, bool exact = false, double dist_threshold = 1e-6);
+        /**
+          * \brief Detects duplicate faces and folding faces.
+          * \details Two triangle faces are said duplicate if they have the same geometry (vertices within a distance
+          *         threshold). Two triangle faces are said folding if they are coplanar, share one edge (i.e., have
+          *         the same edge geometry), and partially overlap.
+          * \param duplicate_faces Returns the duplicate face pairs found.
+          * \param folding_faces Returns the folding face pairs found.
+          * \param dist_threshold Two vertices are considered coincident if there distance is smaller than it.
+          * \pre mesh.is_triangle_mesh().
+          */
+        static void detect_overlapping_faces(
+                SurfaceMesh *mesh,
+                std::vector<std::pair<SurfaceMesh::Face, SurfaceMesh::Face> > &duplicate_faces,
+                std::vector<std::pair<SurfaceMesh::Face, SurfaceMesh::Face> > &folding_faces,
+                double dist_threshold = 1e-12
+        );
 
-        /// \brief Detects and removes duplicate faces.
-        /// @param exact \c true to do exact predict; otherwise use the distance threshold.
-        /// \return The number of faces that has been deleted.
-        static unsigned int remove_duplicate_faces(SurfaceMesh *mesh, bool exact = false, double dist_threshold = 1e-6);
+        /**
+         * \brief Removes duplicate faces and and folding faces.
+          * \details Two triangle faces are said duplicate if they have the same geometry (vertices within a distance
+          *         threshold). Two triangle faces are said folding if they are coplanar, share one edge (i.e., have
+          *         the same edge geometry), and partially overlap.
+         * \param folding_faces \c true also to remove folding faces.
+         * \return The number of faces that have been deleted.
+         * \pre mesh.is_triangle_mesh().
+         */
+        static unsigned int remove_overlapping_faces(
+                SurfaceMesh *mesh,
+                bool folding_faces = false,
+                double dist_threshold = 1e-12
+        );
         //@}
 
 
