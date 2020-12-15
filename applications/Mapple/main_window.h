@@ -106,13 +106,15 @@ private slots:
     void surfaceMeshReportTopologyStatistics();
     void surfaceMeshExtractConnectedComponents();
     void surfaceMeshPlanarPartition();
+    void surfaceMeshPolygonization();
     void surfaceMeshTriangulation();
 
     void surfaceMeshStitchWithReorientation();
     void surfaceMeshStitchWithoutReorientation();
     void surfaceMeshOrientClosedTriangleMesh();
     void surfaceMeshReverseOrientation();
-    void surfaceMeshDetectDuplicateAndFoldingFaces();
+
+    void surfaceMeshRemoveIsolatedVertices();
     void surfaceMeshRemoveDuplicateAndFoldingFaces();
     void surfaceMeshDetectSelfIntersections();
     void surfaceMeshRemeshSelfIntersections();
@@ -135,7 +137,6 @@ private slots:
     void surfaceMeshRemeshing();
     void surfaceMeshParameterization();
     void surfaceMeshGeodesic();
-    void surfaceMeshRemoveIsolatedVertices();
     void surfaceMeshCreateMeshFromText();
 
     // user interaction

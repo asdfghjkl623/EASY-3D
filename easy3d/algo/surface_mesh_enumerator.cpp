@@ -99,6 +99,86 @@ namespace easy3d {
                 ++cur_id;
             }
         }
+
+        return cur_id;
+    }
+
+
+    void SurfaceMeshEnumerator::propagate_planar_component(SurfaceMesh *mesh,
+                                                           SurfaceMesh::FaceProperty<int> id,
+                                                           SurfaceMesh::Face seed, int cur_id,
+                                                           float angle_threshold
+    ) {
+        auto fnormals = mesh->get_face_property<vec3>("f:normal");
+        auto is_degenerate = mesh->get_face_property<bool>("f:SurfaceMeshEnumerator:is_degenerate");
+
+        std::stack<SurfaceMesh::Face> stack;
+        stack.push(seed);
+
+        while (!stack.empty()) {
+            SurfaceMesh::Face top = stack.top();
+            stack.pop();
+            if (id[top] == -1) {
+                id[top] = cur_id;
+                const vec3 &n_top = fnormals[top];
+                for (auto h : mesh->halfedges(top)) {
+                    auto cur = mesh->face(mesh->opposite(h));
+                    if (cur.is_valid() && id[cur] == -1 && !is_degenerate[cur]) {
+                        const vec3 &n_cur = fnormals[cur];
+                        auto angle = geom::angle(n_top, n_cur); // in [-pi, pi]
+                        angle = rad2deg(std::abs(angle));
+                        if (std::abs(angle) < angle_threshold)
+                            stack.push(cur);
+                    }
+                }
+            }
+        }
+    }
+
+
+    int SurfaceMeshEnumerator::enumerate_planar_components(
+            SurfaceMesh *mesh, SurfaceMesh::FaceProperty<int> id,
+            float angle_threshold)
+    {
+        mesh->update_face_normals();
+        auto is_degenerate = mesh->add_face_property<bool>("f:SurfaceMeshEnumerator:is_degenerate", false);
+
+        int num_degenerate = 0;
+        for (auto f : mesh->faces()) {
+            id[f] = -1;
+            if (mesh->is_degenerate(f)) {
+                is_degenerate[f] = true;
+                ++num_degenerate;
+            }
+        }
+
+        int cur_id = 0;
+        for (auto f : mesh->faces()) {
+            if (!is_degenerate[f] && id[f] == -1) {
+                propagate_planar_component(mesh, id, f, cur_id, angle_threshold);
+                cur_id++;
+            }
+        }
+
+        if (num_degenerate > 0) { // propagate the planar partition to degenerate faces
+            LOG(WARNING) << "model has " << num_degenerate << " degenerate faces" << std::endl;
+            int num_propagated = 0;
+            do {
+                num_propagated = 0;
+                for (auto e : mesh->edges()) {
+                    auto f0 = mesh->face(mesh->halfedge(e, 0));
+                    auto f1 = mesh->face(mesh->halfedge(e, 1));
+                    if (f0.is_valid() && f1.is_valid()) {
+                        if (is_degenerate[f0] && id[f0] == -1 && !is_degenerate[f1]) {
+                            id[f0] = id[f1];
+                            ++num_propagated;
+                        }
+                    }
+                }
+            } while (num_propagated > 0);
+        }
+
+        mesh->remove_face_property(is_degenerate);
         return cur_id;
     }
 
