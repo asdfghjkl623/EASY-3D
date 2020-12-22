@@ -189,6 +189,11 @@ namespace easy3d {
         float texture_fractional_repeat() const { return texture_fractional_repeat_; };
         void set_texture_fractional_repeat(float fr) { texture_fractional_repeat_ = fr; };
 
+        // \todo: reuse the texture() and set_texture()
+        bool is_ssao_enabled() const { return ssao_enabled_; }
+        void enable_ssao(bool b) { ssao_enabled_ = b; }
+        void set_ssao_texture(unsigned int tex) { ssao_texture_ = tex; }
+
         /** Clamp the value range of a scalar field. */
         bool clamp_range() const { return clamp_range_; }
         void set_clamp_range(bool b) { clamp_range_ = b; }
@@ -204,6 +209,14 @@ namespace easy3d {
         Material &material() { return material_; }
         const Material &material() const { return material_; }
         void set_material(const Material &m) { material_ = m; }
+
+        /**
+         * Controls the clipping behavior.
+         *  - true completely discard
+         *  - false standard plane clipping
+         */
+        bool plane_clipping_discard() const { return plane_clipping_discard_; };
+        void set_plane_clipping_discard(bool b) { plane_clipping_discard_ = b; };
 
         /**
          * Highlight a subset of primitives of this drawable. Primitives with indices within the range
@@ -241,11 +254,17 @@ namespace easy3d {
         // Control at a finer level: 100 fractional repeat == repeat.
         float texture_fractional_repeat_;
 
+        bool ssao_enabled_;
+        unsigned int ssao_texture_;
+
         bool clamp_range_;
         float clamp_lower_;
         float clamp_upper_;
 
         Material material_;
+
+        // Clipping plane behavior. true: completely discard a vertex in vertex shader; false: standard plane clipping
+        bool plane_clipping_discard_;
 
         // highlight the primitives within the range [highlight_id_low_, highlight_id_high_]
         bool highlight_;

@@ -34,6 +34,7 @@ namespace easy3d {
     class Graph;
     class PointCloud;
     class SurfaceMesh;
+    class PolyMesh;
     class Drawable;
     class PointsDrawable;
     class LinesDrawable;
@@ -141,6 +142,39 @@ namespace easy3d {
          * @param drawable  The drawable.
          */
         void update(Graph* model, LinesDrawable* drawable);
+        //@}
+
+
+
+        /// \name Render buffer update for PolyMesh
+        //@{
+        // PolyMesh ------------------------------------------------------------------------------------------------
+
+        /**
+         * @brief Update render buffers for the default "vertices" drawable of a polyhedral mesh.
+         * Coloring determined by the drawable's coloring scheme.
+         * @param model     The model.
+         * @param drawable  The drawable.
+         */
+        void update(PolyMesh* model, PointsDrawable* drawable);
+
+        /**
+         * @brief Update render buffers for the default "edges" drawable of a polyhedral mesh.
+         * Coloring determined by the drawable's coloring scheme.
+         * @param model     The model.
+         * @param drawable  The drawable.
+         */
+        void update(PolyMesh* model, LinesDrawable* drawable);
+
+        /**
+         * @brief Update render buffers for the default "faces" drawables of a polyhedral mesh.
+         * @note Interior and boundary faces are rendered using two drawables. Thus, this function has an extra
+         *      parameter to specify for which drawable the renderer buffers are be updated.
+         * @param model     The model.
+         * @param drawable  The drawable.
+         * @param border  \c true for the boundary drawable and \c false for the interior drawable.
+         */
+        void update(PolyMesh* model, TrianglesDrawable* drawable, bool border);
         //@}
 
     }   // namespaces buffers

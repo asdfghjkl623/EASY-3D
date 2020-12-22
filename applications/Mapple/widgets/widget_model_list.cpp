@@ -1,10 +1,11 @@
-#include <applications/Mapple/widgets/widget_model_list.h>
-#include <applications/Mapple/main_window.h>
-#include <applications/Mapple/paint_canvas.h>
+#include "widget_model_list.h"
+#include "main_window.h"
+#include "paint_canvas.h"
 
 #include <easy3d/core/graph.h>
 #include <easy3d/core/surface_mesh.h>
 #include <easy3d/core/point_cloud.h>
+#include <easy3d/core/poly_mesh.h>
 #include <easy3d/core/manifold_builder.h>
 #include <easy3d/algo/surface_mesh_components.h>
 #include <easy3d/renderer/renderer.h>
@@ -15,6 +16,7 @@
 #include <QTreeWidgetItem>
 #include <QHeaderView>
 #include <QMouseEvent>
+
 
 
 using namespace easy3d;
@@ -44,10 +46,10 @@ public:
             static QIcon iconGraph(QString::fromUtf8(":/resources/icons/graph.png"));
             QTreeWidgetItem::setIcon(column, iconGraph);
         }
-//        else if (dynamic_cast<CGraph*>(model())) {
-//            static QIcon iconTetrahedra(QString::fromUtf8(":/resources/icons/tetrahedra.png"));
-//            QTreeWidgetItem::setIcon(column, iconTetrahedra);
-//        }
+        else if (dynamic_cast<PolyMesh*>(model())) {
+            static QIcon iconTetrahedra(QString::fromUtf8(":/resources/icons/tetrahedra.png"));
+            QTreeWidgetItem::setIcon(column, iconTetrahedra);
+        }
     }
 
     void setVisibilityIcon(int column, bool visible) {
@@ -286,12 +288,12 @@ void WidgetModelList::duplicateCurrent() {
         else if (dynamic_cast<Graph*>(model)) {
             copy = new Graph(*dynamic_cast<Graph*>(model));
         }
-//        else if (dynamic_cast<Tetrahedra*>(model)) {
-//            copy = new Tetrahedra(*dynamic_cast<Tetrahedra*>(model));
-//        }
+        else if (dynamic_cast<PolyMesh*>(model)) {
+            copy = new PolyMesh(*dynamic_cast<PolyMesh*>(model));
+        }
 
         if (copy) {
-            const std::string name = file_system::parent_directory(model->name()) + "/" + file_system::base_name(model->name()) + "_copy";
+            const std::string &name = file_system::name_less_extension(model->name()) + "_copy";
             copy->set_name(name);
             viewer()->addModel(copy);
             addModel(copy, true);

@@ -27,6 +27,7 @@
 #include <easy3d/core/graph.h>
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/surface_mesh.h>
+#include <easy3d/core/poly_mesh.h>
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/drawable_points.h>
 #include <easy3d/renderer/drawable_lines.h>
@@ -2387,6 +2388,103 @@ namespace easy3d {
         // -------------------------------------------------------------------------------------------------------------
 
 
+        void update(PolyMesh* model, PointsDrawable* drawable) {
+            assert(model);
+            assert(drawable);
+
+            if (model->empty()) {
+                LOG(WARNING) << "model has no valid geometry";
+                return;
+            }
+
+            drawable->update_vertex_buffer(model->points());
+        }
+
+
+        void update(PolyMesh* model, LinesDrawable* drawable) {
+            assert(model);
+            assert(drawable);
+
+            if (model->empty()) {
+                LOG(WARNING) << "model has no valid geometry";
+                return;
+            }
+
+            std::vector<unsigned int> d_indices(model->n_edges() * 2);
+            int idx = 0;
+            for (auto e : model->edges()) {
+                d_indices[idx * 2 ] = model->vertex(e, 0).idx();
+                d_indices[idx * 2 + 1] = model->vertex(e, 1).idx();
+                ++idx;
+            }
+
+            drawable->update_vertex_buffer(model->points());
+            drawable->update_element_buffer(d_indices);
+        }
+
+
+        void update(PolyMesh* model, TrianglesDrawable* drawable, bool border) {
+            assert(model);
+            assert(drawable);
+
+            if (model->empty()) {
+                LOG(WARNING) << "model has no valid geometry";
+                return;
+            }
+
+            if (model->is_tetraheral_mesh()) {
+                std::vector<unsigned int> d_indices;
+                for (auto f : model->faces()) {
+                    if (model->is_border(f) == border) {
+                        for (auto v : model->vertices(f))
+                            d_indices.push_back(v.idx());
+                    }
+                }
+
+                drawable->update_vertex_buffer(model->points());
+                drawable->update_element_buffer(d_indices);
+            }
+            else {
+                /**
+                 * We use the Tessellator to eliminate duplicate vertices. This allows us to take advantage of element
+                 * buffer to minimize the number of vertices sent to the GPU.
+                 */
+                Tessellator tessellator;
+
+                for (auto f : model->faces()) {
+                    if (model->is_border(f) == border) {
+                        tessellator.begin_polygon(model->compute_face_normal(model->halfface(f, 0)));
+                        // tessellator.set_winding_rule(Tessellator::WINDING_NONZERO);  // or POSITIVE
+                        tessellator.begin_contour();
+                        for (auto v : model->vertices(f)) {
+                            Tessellator::Vertex vertex(model->position(v), v.idx());
+                            tessellator.add_vertex(vertex);
+                        }
+                        tessellator.end_contour();
+                        tessellator.end_polygon();
+                    }
+                }
+
+                const std::vector<Tessellator::Vertex *> &vts = tessellator.vertices();
+                std::vector<vec3> d_points;
+                d_points.reserve(vts.size());
+
+                for (auto v :vts)
+                    d_points.emplace_back(v->data());
+
+                const auto &d_indices = tessellator.elements();
+
+                drawable->update_vertex_buffer(d_points);
+                drawable->update_element_buffer(d_indices);
+
+                DLOG(INFO) << "num of vertices in model/sent to GPU: " << model->n_vertices() << "/" << d_points.size();
+            }
+        }
+
+
+        // -------------------------------------------------------------------------------------------------------------
+
+
         void update(Model *model, Drawable *drawable) {
             if (model->empty()) {
                 LOG(WARNING) << "model has no valid geometry";
@@ -2406,9 +2504,7 @@ namespace easy3d {
                         update(mesh, dynamic_cast<PointsDrawable *>(drawable));
                         break;
                 }
-            }
-
-            if (dynamic_cast<PointCloud *>(model)) {
+            } else if (dynamic_cast<PointCloud *>(model)) {
                 PointCloud *cloud = dynamic_cast<PointCloud *>(model);
                 switch (drawable->type()) {
                     case Drawable::DT_POINTS:
@@ -2432,6 +2528,20 @@ namespace easy3d {
                         break;
                     case Drawable::DT_TRIANGLES:
                         update(graph, dynamic_cast<TrianglesDrawable *>(drawable));
+                        break;
+                }
+            }
+            else if (dynamic_cast<PolyMesh *>(model)) {
+                PolyMesh *mesh = dynamic_cast<PolyMesh *>(model);
+                switch (drawable->type()) {
+                    case Drawable::DT_TRIANGLES:
+                        update(mesh, dynamic_cast<TrianglesDrawable *>(drawable), drawable->name() == "faces:border");
+                        break;
+                    case Drawable::DT_LINES:
+                        update(mesh, dynamic_cast<LinesDrawable *>(drawable));
+                        break;
+                    case Drawable::DT_POINTS:
+                        update(mesh, dynamic_cast<PointsDrawable *>(drawable));
                         break;
                 }
             }

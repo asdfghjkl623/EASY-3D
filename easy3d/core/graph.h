@@ -81,6 +81,11 @@ namespace easy3d {
 				return idx_ < _rhs.idx_;
 			}
 
+            /// helper structure to be able to use std::unordered_map
+            struct Hash {
+                std::size_t operator()(const BaseHandle& h) const { return h.idx(); }
+            };
+
 		private:
 			friend class VertexIterator;
 			friend class EdgeIterator;
@@ -122,8 +127,7 @@ namespace easy3d {
 		/// \sa VertexConnectivity
 		struct EdgeConnectivity
 		{
-			Vertex  source_;    /// vertex the edge points to
-			Vertex  target_;    /// vertex the edge originates from
+            std::vector<Vertex>  vertices_;
 		};
 
 
@@ -610,14 +614,7 @@ namespace easy3d {
 		Vertex vertex(Edge e, unsigned int i) const
 		{
 			assert(i<=1);
-			if (i == 0)
-				return econn_[e].source_;
-			else if (i == 1)
-				return econn_[e].target_;
-			else {
-				std::cerr << "index out of range" << std::endl;
-				return Vertex();
-			}
+			return econn_[e].vertices_[i];
 		}
 
 		//@}

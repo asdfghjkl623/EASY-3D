@@ -27,6 +27,7 @@
 #include <easy3d/core/graph.h>
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/surface_mesh.h>
+#include <easy3d/core/poly_mesh.h>
 #include <easy3d/renderer/drawable_points.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_triangles.h>
@@ -105,6 +106,39 @@ namespace easy3d {
             edges->set_line_width(setting::graph_edges_line_width);
             edges->set_impostor_type(LinesDrawable::CYLINDER);
             edges->set_visible(true);
+        } else if (dynamic_cast<PolyMesh *>(model)) {
+            PolyMesh *mesh = dynamic_cast<PolyMesh *>(model);
+
+            // we have two faces drawables for polyhedral meshes
+            // interior faces
+            auto interior_faces = mesh->renderer()->add_triangles_drawable("faces:interior");
+            interior_faces->set_uniform_coloring(setting::triangles_drawable_backside_color);
+            interior_faces->set_distinct_back_color(false);
+            interior_faces->set_lighting_two_sides(true);
+            interior_faces->set_visible(true);
+            interior_faces->set_plane_clipping_discard(true);
+            // border faces
+            auto border_faces = mesh->renderer()->add_triangles_drawable("faces:border");
+            border_faces->set_uniform_coloring(setting::surface_mesh_faces_color);
+            border_faces->set_distinct_back_color(false);
+            border_faces->set_lighting_two_sides(true);
+            border_faces->set_visible(true);
+            border_faces->set_plane_clipping_discard(true);
+
+            // edges
+            auto edges = mesh->renderer()->add_lines_drawable("edges");
+            edges->set_uniform_coloring(setting::surface_mesh_edges_color);
+            edges->set_line_width(setting::surface_mesh_edges_line_width);
+            edges->set_visible(setting::surface_mesh_show_edges);
+            edges->set_plane_clipping_discard(true);
+
+            // vertices
+            auto vertices = mesh->renderer()->add_points_drawable("vertices");
+            vertices->set_uniform_coloring(setting::surface_mesh_vertices_color);
+            vertices->set_impostor_type(PointsDrawable::SPHERE);
+            vertices->set_point_size(setting::surface_mesh_vertices_point_size);
+            vertices->set_visible(setting::surface_mesh_show_vertices);
+            edges->set_plane_clipping_discard(true);
         }
     }
 

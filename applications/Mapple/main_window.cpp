@@ -40,7 +40,9 @@
 #include <easy3d/core/surface_mesh.h>
 #include <easy3d/core/graph.h>
 #include <easy3d/core/point_cloud.h>
+#include <easy3d/core/poly_mesh.h>
 #include <easy3d/core/random.h>
+#include <easy3d/core/manifold_builder.h>
 #include <easy3d/renderer/setting.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/renderer.h>
@@ -49,6 +51,7 @@
 #include <easy3d/fileio/point_cloud_io.h>
 #include <easy3d/fileio/graph_io.h>
 #include <easy3d/fileio/surface_mesh_io.h>
+#include <easy3d/fileio/poly_mesh_io.h>
 #include <easy3d/fileio/ply_reader_writer.h>
 #include <easy3d/fileio/point_cloud_io_ptx.h>
 #include <easy3d/fileio/resources.h>
@@ -56,6 +59,7 @@
 #include <easy3d/algo/surface_mesh_components.h>
 #include <easy3d/algo/surface_mesh_topology.h>
 #include <easy3d/algo/surface_mesh_triangulation.h>
+#include <easy3d/algo/surface_mesh_tetrahedralization.h>
 #include <easy3d/algo/surface_mesh_subdivision.h>
 #include <easy3d/algo/surface_mesh_geodesic.h>
 #include <easy3d/algo/surface_mesh_stitching.h>
@@ -152,6 +156,9 @@ MainWindow::MainWindow(QWidget *parent)
     // surface mesh menu
     createActionsForSurfaceMeshMenu();
 
+    // polyhedral mesh menu
+    createActionsForPolyMeshMenu();
+
     // status bar
     createStatusBar();
 
@@ -215,13 +222,13 @@ void MainWindow::createStatusBar()
     statusBar()->addWidget(labelStatusInfo_);
 
     labelPointUnderMouse_ = new QLabel("XYZ = [-, -, -]");
-    labelPointUnderMouse_->setFixedWidth(300);
+    labelPointUnderMouse_->setFixedWidth(400);
     labelPointUnderMouse_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     statusBar()->addWidget(labelPointUnderMouse_);
 
     //////////////////////////////////////////////////////////////////////////
 
-    const int length = 150;
+    const int length = 120;
     labelNumFaces_ = new QLabel;
     labelNumFaces_->setMinimumWidth(length);
     labelNumFaces_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -236,6 +243,11 @@ void MainWindow::createStatusBar()
     labelNumEdges_->setMinimumWidth(length);
     labelNumEdges_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     statusBar()->addWidget(labelNumEdges_);
+
+    labelNumCells_ = new QLabel;
+    labelNumCells_->setMinimumWidth(length);
+    labelNumCells_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    statusBar()->addWidget(labelNumCells_);
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -253,7 +265,7 @@ void MainWindow::createStatusBar()
 
 void MainWindow::updateStatusBar()
 {
-    QString faces(""), vertices(""), edges("");
+    QString faces(""), vertices(""), edges(""), cells("");
 
     Model* model = viewer_->currentModel();
     if (dynamic_cast<SurfaceMesh*>(model)) {
@@ -263,6 +275,7 @@ void MainWindow::updateStatusBar()
         edges = QString("#edges: %1").arg(mesh->n_edges());
         labelNumFaces_->setVisible(true);
         labelNumEdges_->setVisible(true);
+        labelNumCells_->setVisible(false);
     }
 
     else if (dynamic_cast<PointCloud*>(model)) {
@@ -270,18 +283,33 @@ void MainWindow::updateStatusBar()
         vertices = QString("#vertices: %1").arg(cloud->n_vertices());
         labelNumFaces_->setVisible(false);
         labelNumEdges_->setVisible(false);
+        labelNumCells_->setVisible(false);
     }
 
     else if (dynamic_cast<Graph*>(model)) {
         auto graph = dynamic_cast<Graph*>(model);
         vertices = QString("#vertices: %1").arg(graph->n_vertices());
-        edges = QString("#meta: %1").arg(graph->n_edges());
+        edges = QString("#edges: %1").arg(graph->n_edges());
         labelNumFaces_->setVisible(false);
         labelNumEdges_->setVisible(true);
+        labelNumCells_->setVisible(false);
     }
 
-    labelNumFaces_->setText( faces );
+    else if (dynamic_cast<PolyMesh*>(model)) {
+        auto mesh = dynamic_cast<PolyMesh*>(model);
+        faces = QString("#faces: %1").arg(mesh->n_faces());
+        vertices = QString("#vertices: %1").arg(mesh->n_vertices());
+        edges = QString("#edges: %1").arg(mesh->n_edges());
+        cells = QString("#cells: %1").arg(mesh->n_cells());
+        labelNumFaces_->setVisible(true);
+        labelNumEdges_->setVisible(true);
+        labelNumCells_->setVisible(true);
+    }
+
+
     labelNumVertices_->setText( vertices );
+    labelNumFaces_->setText( faces );
+    labelNumCells_->setText( cells );
     labelNumEdges_->setText( edges );
 }
 
@@ -326,9 +354,10 @@ bool MainWindow::onOpen() {
                 this,
                 "Open file(s)",
                 curDataDirectory_,
-                "Supported formats (*.ply *.obj *.off *.stl *.poly *.trilist *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg *.ptx)\n"
-                "Mesh formats (*.ply *.obj *.off *.stl *.poly *.trilist)\n"
-                "Point set formats (*.ply *.bin *.ptx *.las *.laz *.xyz *.bxyz *.vg *.bvg *.ptx)\n"
+                "Supported formats (*.ply *.obj *.off *.stl *.poly *.trilist *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg *.ptx *.plm)\n"
+                "Surface Mesh (*.ply *.obj *.off *.stl *.poly *.trilist)\n"
+                "Point Cloud (*.ply *.bin *.ptx *.las *.laz *.xyz *.bxyz *.vg *.bvg *.ptx)\n"
+                "Polytope Mesh (*.plm)\n"
                 "All formats (*.*)"
             );
 
@@ -369,9 +398,10 @@ bool MainWindow::onSave() {
                 this,
                 "Open file(s)",
                 QString::fromStdString(default_file_name),
-                "Supported formats (*.ply *.obj *.off *.stl *.poly *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg)\n"
-                "Mesh formats (*.ply *.obj *.off *.stl *.poly)\n"
-                "Point set formats (*.ply *.bin *.ptx *.las *.laz *.xyz *.bxyz *.vg *.bvg)\n"
+                "Supported formats (*.ply *.obj *.off *.stl *.poly *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg *.plm)\n"
+                "Surface Mesh (*.ply *.obj *.off *.stl *.poly)\n"
+                "Point Cloud (*.ply *.bin *.ptx *.las *.laz *.xyz *.bxyz *.vg *.bvg)\n"
+                "Polytope Mesh (*.plm)\n"
                 "All formats (*.*)"
     );
 
@@ -390,6 +420,10 @@ bool MainWindow::onSave() {
     else if (dynamic_cast<const Graph*>(model)) {
         const Graph* graph = dynamic_cast<const Graph*>(model);
         saved = GraphIO::save(fileName.toStdString(), graph);
+    }
+    else if (dynamic_cast<const PolyMesh*>(model)) {
+        const PolyMesh* mesh = dynamic_cast<const PolyMesh*>(model);
+        saved = PolyMeshIO::save(fileName.toStdString(), mesh);
     }
 
     if (saved) {
@@ -422,6 +456,8 @@ Model* MainWindow::open(const std::string& file_name) {
     }
     else if (ext == "ply" && io::PlyReader::num_instances(file_name, "edge") > 0) {
         model = GraphIO::load(file_name);
+    } else if (ext == "plm") {
+        model = PolyMeshIO::load(file_name);
     }
     else { // point cloud
         if (ext == "ptx") {
@@ -796,6 +832,7 @@ void MainWindow::createActionsForSurfaceMeshMenu() {
     connect(ui->actionPlanarPartition, SIGNAL(triggered()), this, SLOT(surfaceMeshPlanarPartition()));
     connect(ui->actionPolygonization, SIGNAL(triggered()), this, SLOT(surfaceMeshPolygonization()));
     connect(ui->actionSurfaceMeshTriangulation, SIGNAL(triggered()), this, SLOT(surfaceMeshTriangulation()));
+    connect(ui->actionSurfaceMeshTetrahedralization, SIGNAL(triggered()), this, SLOT(surfaceMeshTetrahedralization()));
 
     connect(ui->actionSurfaceMeshRepairPolygonSoup, SIGNAL(triggered()), this, SLOT(surfaceMeshRepairPolygonSoup()));
     connect(ui->actionSurfaceMeshOrientAndStitchPolygonSoup, SIGNAL(triggered()), this, SLOT(surfaceMeshOrientAndStitchPolygonSoup()));
@@ -828,6 +865,11 @@ void MainWindow::createActionsForSurfaceMeshMenu() {
     connect(ui->actionSurfaceMeshGeodesic, SIGNAL(triggered()), this, SLOT(surfaceMeshGeodesic()));
     connect(ui->actionSamplingSurfaceMesh, SIGNAL(triggered()), this, SLOT(surfaceMeshSampling()));
     connect(ui->actionCreateSurfaceMeshFromText, SIGNAL(triggered()), this, SLOT(surfaceMeshCreateMeshFromText()));
+}
+
+
+void MainWindow::createActionsForPolyMeshMenu() {
+    connect(ui->actionPolyMeshExtractBoundary, SIGNAL(triggered()), this, SLOT(polymeshExtractBoundary()));
 }
 
 
@@ -926,6 +968,27 @@ void MainWindow::surfaceMeshTriangulation() {
     updateUi();
 }
 
+
+void MainWindow::surfaceMeshTetrahedralization() {
+    auto mesh = dynamic_cast<SurfaceMesh*>(viewer_->currentModel());
+    if (!mesh)
+        return;
+
+    StopWatch w;
+
+    SurfaceMeshTetrehedralization tetra;
+    PolyMesh* result = tetra.tetrahedralize(mesh);
+    if (result) {
+        LOG(INFO) << "done. " << w.time_string() << std::endl;
+
+        const std::string &name = file_system::name_less_extension(mesh->name()) + "_tetrahedralization.plm";
+        result->set_name(name);
+
+        viewer_->addModel(result);
+        updateUi();
+        viewer_->update();
+    }
+}
 
 
 void MainWindow::surfaceMeshRepairPolygonSoup() {
@@ -1188,7 +1251,7 @@ void MainWindow::surfaceMeshSlice() {
 
 #if HAS_CGAL
 
-#if 1 // slice by the visual clipping plane
+#if 0 // slice by the visual clipping plane
 
     auto clipping_plane = easy3d::setting::clipping_plane;
     if (!clipping_plane || !clipping_plane->is_enabled()) {
@@ -1316,6 +1379,51 @@ void MainWindow::pointCloudNormalizeNormals() {
 
     cloud->renderer()->update();
     viewer()->update();
+}
+
+
+void MainWindow::polymeshExtractBoundary() {
+    PolyMesh* poly = dynamic_cast<PolyMesh*>(viewer()->currentModel());
+    if (!poly)
+        return;
+
+    std::unordered_map<PolyMesh::Vertex, SurfaceMesh::Vertex, PolyMesh::Vertex::Hash> unique_vertex;
+    std::vector<PolyMesh::Vertex> vertices;
+    std::vector< std::vector<SurfaceMesh::Vertex> > faces;
+
+    for (auto h : poly->halffaces()) {
+        if (poly->is_border(h)) {
+            std::vector<SurfaceMesh::Vertex> face;
+            for (auto v : poly->vertices(h)) {
+                auto pos = unique_vertex.find(v);
+                if (pos == unique_vertex.end()) {
+                    auto sv = SurfaceMesh::Vertex(vertices.size());
+                    unique_vertex[v] = sv;
+                    face.push_back(sv);
+                    vertices.push_back(v);
+                }
+                else
+                    face.push_back(pos->second);
+            }
+            faces.push_back(face);
+        }
+    }
+
+    SurfaceMesh* mesh = new SurfaceMesh;
+    const std::string &name = file_system::name_less_extension(poly->name()) + "_boundary.ply";
+    mesh->set_name(name);
+
+    ManifoldBuilder builder(mesh);
+    builder.begin_surface();
+    for (auto v : vertices)
+        builder.add_vertex(poly->position(v));
+    for (auto f : faces)
+        builder.add_face(f);
+    builder.end_surface();
+
+    viewer_->addModel(mesh);
+    updateUi();
+    viewer_->update();
 }
 
 
@@ -1700,7 +1808,7 @@ void MainWindow::pointCloudDelaunayTriangulation2D() {
     delaunay.set_vertices(points);
 
     SurfaceMesh* mesh = new SurfaceMesh;
-    const std::string& name = file_system::parent_directory(cloud->name()) + "/" + file_system::base_name(cloud->name()) + "_delaunay_XY";
+    const std::string &name = file_system::name_less_extension(mesh->name()) + "_delaunay_XY.ply";
     mesh->set_name(name);
 
     for (std::size_t i = 0; i < points.size(); i++) {
@@ -1729,37 +1837,33 @@ void MainWindow::pointCloudDelaunayTriangulation3D() {
     if (!cloud)
         return;
 
-    const std::vector<vec3>& pts = cloud->points();
+    const std::vector<vec3>& points = cloud->points();
     Delaunay3 delaunay;
-    delaunay.set_vertices(pts);
+    delaunay.set_vertices(points);
 
-    LOG(WARNING) << "triangulation done. TODO: implement a data structure to store and visualize the result";
+    PolyMesh* mesh = new PolyMesh;
+    const std::string &name = file_system::name_less_extension(mesh->name()) + "_delaunay.ply";
+    mesh->set_name(name);
 
-//    CGraph* whet_grid = new CGraph;
-//    CGraphBuilder builder;
-//    builder.set_target(whet_grid);
-//    builder.begin_volume();
-//
-//    builder.build_meta_tetrahedron();
-//
-//    for (std::size_t i = 0; i < points.size(); i++) {
-//        builder.add_vertex(points[i]);
-//    }
-//
-//    std::cerr << "Nb tets = " << delaunay.nb_tets() << std::endl;
-//    for (unsigned int i = 0; i < delaunay.nb_tets(); i++) {
-//        builder.begin_cell(0);
-//        for (int j = 0; j < 4; j++) {
-//            int v = delaunay.tet_vertex(i, j);
-//            mpl_debug_assert(v >= 0);
-//            mpl_debug_assert(v < points.size());
-//            builder.add_vertex_to_cell(v);
-//        }
-//        builder.end_cell();
-//    }
-//    builder.end_volume();
-//
-//    const std::string& name = FileUtils::dir_name(pset->name()) + "/" + FileUtils::base_name(pset->name()) + "_delaunay";
-//    whet_grid->set_name(name);
-//    main_window_->addModel(whet_grid, true, false);
+    for (std::size_t i = 0; i < points.size(); i++) {
+        mesh->add_vertex(points[i]);
+    }
+
+    LOG(INFO) << "building tetrahedral mesh with " << delaunay.nb_tets() << " tetrahedra..." << std::endl;
+    StopWatch w;
+    for (unsigned int i = 0; i < delaunay.nb_tets(); i++) {
+        PolyMesh::Vertex vts[4];
+        for (int j = 0; j < 4; j++) {
+            int v = delaunay.tet_vertex(i, j);
+            assert(v >= 0);
+            assert(v < points.size());
+            vts[j] = PolyMesh::Vertex(v);
+        }
+        mesh->add_tetra(vts[0], vts[1], vts[2], vts[3]);
+    }
+    LOG(INFO) << "done. " << w.time_string() << std::endl;
+
+    viewer_->addModel(mesh);
+    updateUi();
+    viewer_->update();
 }

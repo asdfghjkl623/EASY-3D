@@ -39,7 +39,10 @@ namespace easy3d {
             , smooth_shading_(setting::surface_mesh_phong_shading)
             , opacity_(0.6f)
     {
-       set_uniform_coloring(setting::surface_mesh_faces_color);
+        lighting_two_sides_ = setting::triangles_drawable_two_side_lighting;
+        distinct_back_color_ = setting::triangles_drawable_distinct_backside_color;
+        back_color_ = setting::triangles_drawable_backside_color;
+        set_uniform_coloring(setting::surface_mesh_faces_color);
     }
 
 
@@ -94,7 +97,7 @@ namespace easy3d {
                 ->set_uniform("distinct_back_color",distinct_back_color())
                 ->set_uniform("backside_color",back_color())
                 ->set_uniform("smooth_shading", smooth_shading())
-                ->set_uniform("ssaoEnabled", false)
+                ->set_uniform("ssaoEnabled", is_ssao_enabled())
                 ->set_uniform("per_vertex_color",coloring_method() != State::UNIFORM_COLOR && color_buffer())
                 ->set_uniform("default_color",color())
                 ->set_block_uniform("Material", "ambient",material().ambient)
@@ -105,9 +108,14 @@ namespace easy3d {
                 ->set_uniform("hightlight_id_max",highlight_range().second);
 
         if (setting::clipping_plane)
-            setting::clipping_plane->set_program(program);
+            setting::clipping_plane->set_program(program, plane_clipping_discard());
 
+        if (is_ssao_enabled())
+            program->bind_texture("ssaoTexture", ssao_texture_, 0);
         gl_draw(with_storage_buffer);
+        if (is_ssao_enabled())
+            program->release_texture();
+
         program->release();
     }
 
@@ -162,7 +170,7 @@ namespace easy3d {
                 ->set_uniform("hightlight_id_max",highlight_range().second);
 
         if (setting::clipping_plane)
-            setting::clipping_plane->set_program(program);
+            setting::clipping_plane->set_program(program, plane_clipping_discard());
 
         gl_draw(with_storage_buffer);
 

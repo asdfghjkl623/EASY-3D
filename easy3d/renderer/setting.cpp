@@ -35,9 +35,19 @@ namespace easy3d {
 
         // lighting
         vec4 light_position = vec4(0.27f, 0.27f, 0.92f, 0.0f);
-        bool light_distinct_back_color = false;
-        vec4 back_color = vec4(0.8f, 0.4f, 0.4f, 1.0f);
-        bool light_two_sides = false;
+
+        // drawable lighting
+        bool triangles_drawable_two_side_lighting = true;
+        bool points_drawable_two_side_lighting = true;
+        bool lines_drawable_two_side_lighting = false;
+        // drawable distinct backside color
+        bool triangles_drawable_distinct_backside_color = true;
+        bool points_drawable_distinct_backside_color = false;
+        bool lines_drawable_distinct_backside_color = false;
+        // drawable backside color
+        vec4 triangles_drawable_backside_color = vec4(0.8f, 0.4f, 0.4f, 1.0f);
+        vec4 points_drawable_backside_color = vec4(0.8f, 0.4f, 0.4f, 1.0f);
+        vec4 lines_drawable_backside_color = vec4(0.8f, 0.4f, 0.4f, 1.0f);
 
         // material
         vec4 material_ambient = vec4(0.05f, 0.05f, 0.05f, 1.0f);
@@ -60,14 +70,14 @@ namespace easy3d {
         // point cloud
         bool point_cloud_use_color_property = true;
         bool point_cloud_show_points = true;
-        vec4 point_cloud_points_color = vec4(85 / 255.0f, 170 / 255.0f, 1.0f, 1.0f);
+        vec4 point_cloud_points_color = vec4(0.33f, 0.67f, 1.0f, 1.0f);
         float point_cloud_point_size = 2.0f;
         bool point_cloud_impostors = false;
 
         // surface mesh - surface
         bool surface_mesh_phong_shading = false;
         bool surface_mesh_show_faces = true;
-        vec4 surface_mesh_faces_color = vec4(0.4f, 0.8f, 0.8f, 1.0f);
+        vec4 surface_mesh_faces_color = vec4(1.0f, 0.8f, 0.4f, 1.0f);
         bool surface_mesh_use_color_property = true;
         float surface_mesh_opacity = 0.6f;
 

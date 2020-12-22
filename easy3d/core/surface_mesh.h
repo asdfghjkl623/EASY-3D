@@ -102,7 +102,7 @@ namespace easy3d {
                 return idx_ < _rhs.idx_;
             }
 
-            // [Liangliang]: to be able to use std::unordered_map
+            /// helper structure to be able to use std::unordered_map
             struct Hash {
                 std::size_t operator()(const BaseHandle& h) const { return h.idx(); }
             };
@@ -129,6 +129,7 @@ namespace easy3d {
         {
             /// default constructor (with invalid index)
             explicit Halfedge(int _idx=-1) : BaseHandle(_idx) {}
+            std::ostream& operator<<(std::ostream& os) const { return os << 'h' << idx(); }
         };
 
 
@@ -138,6 +139,7 @@ namespace easy3d {
         {
             /// default constructor (with invalid index)
             explicit Edge(int _idx=-1) : BaseHandle(_idx) {}
+            std::ostream& operator<<(std::ostream& os) const { return os << 'e' << idx(); }
         };
 
 
@@ -147,6 +149,7 @@ namespace easy3d {
         {
             /// default constructor (with invalid index)
             explicit Face(int _idx=-1) : BaseHandle(_idx) {}
+            std::ostream& operator<<(std::ostream& os) const { return os << 'f' << idx(); }
         };
 
 
@@ -942,7 +945,21 @@ namespace easy3d {
 
         /// assign \c rhs to \c *this. does not copy custom properties.
         SurfaceMesh& assign(const SurfaceMesh& rhs);
+        //@}
 
+        //!@}
+        //! \name File IO
+        //!@{
+
+        //! \brief Read mesh from a POLY file \p filename.
+        //! Mainly for quite debug purposes. Client code should use SurfaceMeshIO.
+        //! \sa SurfaceMeshIO.
+        bool read_poly(const std::string& filename);
+
+        //! \brief Write mesh to a POLY file \p filename.
+        //! Mainly for quite debug purposes. Client code should use SurfaceMeshIO.
+        //! \sa SurfaceMeshIO.
+        bool write_poly(const std::string& filename) const;
         //@}
 
     public: //----------------------------------------------- add new vertex / face
