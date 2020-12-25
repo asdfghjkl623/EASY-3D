@@ -28,15 +28,17 @@
   programmable-shader-style rendering, i.e., no fixed function calls). Client code does not need to touch the low-level 
   APIs of OpenGL. 
   
-* Step-by-step tutorials to get acquainted with the data structures, rendering techniques, and algorithms 
+* Step-by-step tutorials demonstrating various uses of the API, to get acquainted with the data structures, rendering techniques, and algorithms 
   for 3D modeling and geometry processing. 
     
 * A viewer that can be used directly to visualize 3D scenes in various formats, which can also be easily extended.
 
 * A handy tool <b>Mapple</b> created out of the Easy3D library for rendering and processing 3D data.
 
-![](resources/images/mapple.jpg)
- 
+|                 Scalar field                  |                   Polyhedral mesh                |
+|-----------------------------------------------|--------------------------------------------------|
+| ![Scalar field](resources/images/mapple.jpg)  | ![Polyhedral mesh](resources/images/mapple2.gif) |
+
 ### A quick glance ###
 
 Any types of 3D drawables (e.g., points, lines, triangles, and thus point clouds, mesh surfaces, scalar fields, 

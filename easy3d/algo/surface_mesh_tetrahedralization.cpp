@@ -27,6 +27,7 @@
 #include <easy3d/core/surface_mesh.h>
 #include <easy3d/core/poly_mesh.h>
 #include <easy3d/util/logging.h>
+#include <easy3d/util/stop_watch.h>
 
 #include <3rd_party/tetgen/tetgen.h>
 
@@ -35,8 +36,8 @@ namespace easy3d {
 
 
     SurfaceMeshTetrehedralization::SurfaceMeshTetrehedralization()
-            : add_steiner_points_on_exterior_boundary_(true), add_steiner_points_on_interior_boundary_(true),
-              tag_regions_(false), max_tet_shape_(2.0), max_tet_volume_(-1.0) {
+            : allow_steiner_points_on_boundary_(true), tag_regions_(false), max_tet_shape_(2.0),
+              min_dihedral_angle_(0.0), max_tet_volume_(-1.0), command_line_("") {
     }
 
 
@@ -44,7 +45,7 @@ namespace easy3d {
     }
 
 
-    PolyMesh *SurfaceMeshTetrehedralization::tetrahedralize(SurfaceMesh *mesh) {
+    PolyMesh *SurfaceMeshTetrehedralization::apply(SurfaceMesh *mesh) {
         if (!mesh) {
             LOG(WARNING) << "input mesh is NULL";
             return nullptr;
@@ -57,47 +58,51 @@ namespace easy3d {
             }
         }
 
+        StopWatch w;
+        LOG(INFO) << "tetrahedralizing...";
+
         tetgenbehavior *tetgen_args = new tetgenbehavior;
         // Create tetgen argument string from options.
-        if (cmdline_ == "") {
+        if (command_line_.empty()) {
             std::ostringstream s;
             // Q: quiet
-            // p: input data is surfacic
+            // p: input data is surface
             // n: output tet neighbors
             // q: desired quality
             // V: verbose
             s << "Qpnq" << max_tet_shape_;
+            LOG(INFO) << "maximum allowed radius-edge ratio: " << max_tet_shape_;
+
+            if (min_dihedral_angle_ > 0) {
+                s << "/" << min_dihedral_angle_;
+                LOG(INFO) << "minimum allowed dihedral angle: " << min_dihedral_angle_;
+            }
+
             if (max_tet_volume_ > 0.0) {
                 s << "a" << max_tet_volume_;
+                LOG(INFO) << "max allowed tetrahedron volume: " << max_tet_volume_;
             }
 
-            // AA: generate region tags for each shell.
+            // A: generate region tags for each shell.
             if (tag_regions_) {
-                s << "AA";
+                s << "A";
+                LOG(INFO) << "adding a cell property \"c:region\" to indicate different bounded regions";
             }
 
-            // YY: prohibit steiner points on boundaries (first Y for exterior boundary, second Y for the other ones).
-            if (add_steiner_points_on_exterior_boundary_ && !add_steiner_points_on_interior_boundary_) {
-                LOG(WARNING)
-                        << "invalid combination of flags (does not preserve exterior boundary and preserves interior ones)"
-                        << " - preserving exterior boundary as well ...";
-                add_steiner_points_on_exterior_boundary_ = false;
-            }
-
-            if (!add_steiner_points_on_exterior_boundary_) {
+            // Y: prohibit steiner points on boundaries
+            if (allow_steiner_points_on_boundary_)
+                LOG(INFO) << "allowing Steiner points on the boundary edges and faces";
+            if (!allow_steiner_points_on_boundary_) {
                 s << "Y";
-            }
-
-            if (!add_steiner_points_on_interior_boundary_) {
-                s << "Y";
+                LOG(INFO) << "preserving boundary edges and faces";
             }
 
             std::string arg_str = s.str();
             LOG(INFO) << "using command line: " << arg_str;
             tetgen_args->parse_commandline(const_cast<char *>(arg_str.c_str()));
         } else {
-            LOG(INFO) << "using user-specified command line: " << cmdline_;
-            tetgen_args->parse_commandline(const_cast<char *>(cmdline_.c_str()));
+            LOG(INFO) << "using user-specified command line: " << command_line_;
+            tetgen_args->parse_commandline(const_cast<char *>(command_line_.c_str()));
         }
 
         tetgenio *tetgen_surface = to_tetgen_surface(mesh);
@@ -106,12 +111,26 @@ namespace easy3d {
         try {
             ::tetrahedralize(tetgen_args, tetgen_surface, tetgen_volume);
         } catch (...) {
-            LOG(ERROR) << "tetgen encountered an error, relaunching in diagnose mode" << std::endl;
-            tetgen_args->parse_commandline(const_cast<char *>("d"));
-            ::tetrahedralize(tetgen_args, tetgen_surface, tetgen_volume);
+            LOG(ERROR) << "tetgen encountered an error, relaunching in diagnose mode";
+            tetgen_args->parse_commandline(const_cast<char *>("pd"));
+            try {
+                ::tetrahedralize(tetgen_args, tetgen_surface, tetgen_volume);
+            } catch (const std::exception& e) {
+                LOG(ERROR) << e.what() << " Result may not be valid.";
+            }
         }
 
         PolyMesh *result = to_easy3d_poly_mesh(tetgen_volume);
+
+        if (result) {
+            LOG(INFO) << "done. "
+                      << "#vertex: " << result->n_vertices() << ", "
+                      << "#edge: " << result->n_edges() << ", "
+                      << "#face: " << result->n_faces() << ", "
+                      << "#cell: " << result->n_cells() << "). "
+                      << w.time_string();
+        } else
+            LOG(WARNING) << "tetrehedralization failed. " << w.time_string();
 
         delete tetgen_args;
         delete tetgen_surface;
@@ -160,6 +179,9 @@ namespace easy3d {
 
 
     PolyMesh *SurfaceMeshTetrehedralization::to_easy3d_poly_mesh(tetgenio *volume) {
+        if (volume->numberofpoints <= 0 || volume->numberoftetrahedra <= 0)
+            return nullptr;
+
         PolyMesh *mesh = new PolyMesh;
 
         PolyMesh::CellProperty<double> region;

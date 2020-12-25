@@ -31,6 +31,102 @@
 
 namespace easy3d {
 
+    namespace details {
+
+        template<typename T>
+        inline void read(std::istream &input, std::set<T>& data) {
+            unsigned int size(0);
+            input.read((char*)&size, sizeof(unsigned int));
+            std::vector<T> array(size);
+            input.read((char*)array.data(), size * sizeof(T));
+            data = std::set<T>(array.begin(), array.end());
+        }
+
+        template<typename T>
+        inline void write(std::ostream &output, const std::set<T>& data) {
+            unsigned int size = data.size();
+            output.write((char*)&size, sizeof(unsigned int));
+            std::vector<T> array(data.begin(), data.end());
+            output.write((char*)array.data(), size * sizeof(T));
+        }
+
+        template<typename T>
+        inline void read(std::istream &input, std::vector<T>& data) {
+            unsigned int size(0);
+            input.read((char*)&size, sizeof(unsigned int));
+            data.resize(size);
+            input.read((char*)data.data(), size * sizeof(T));
+        }
+
+        template<typename T>
+        inline void write(std::ostream &output, const std::vector<T>& data) {
+            unsigned int size = data.size();
+            output.write((char*)&size, sizeof(unsigned int));
+            output.write((char*)data.data(), size * sizeof(T));
+        }
+    }
+
+
+    void PolyMesh::VertexConnectivity::read(std::istream &input) {
+        details::read(input, vertices_);
+        details::read(input, edges_);
+        details::read(input, halffaces_);
+        details::read(input, cells_);
+    }
+    
+
+    void PolyMesh::VertexConnectivity::write(std::ostream &output) const {
+        details::write(output, vertices_);
+        details::write(output, edges_);
+        details::write(output, halffaces_);
+        details::write(output, cells_);
+    }
+
+
+    void PolyMesh::EdgeConnectivity::read(std::istream &input) {
+        details::read(input, vertices_);
+        details::read(input, halffaces_);
+        details::read(input, cells_);
+    }
+
+
+    void PolyMesh::EdgeConnectivity::write(std::ostream &output) const {
+        details::write(output, vertices_);
+        details::write(output, halffaces_);
+        details::write(output, cells_);
+    }
+
+
+    void PolyMesh::HalfFaceConnectivity::read(std::istream &input) {
+        details::read(input, vertices_);
+        details::read(input, edges_);
+        input.read((char*)(&cell_), sizeof(Cell));
+        input.read((char*)(&opposite_), sizeof(HalfFace));
+    }
+
+
+    void PolyMesh::HalfFaceConnectivity::write(std::ostream &output) const {
+        details::write(output, vertices_);
+        details::write(output, edges_);
+        output.write((char*)(&cell_), sizeof(Cell));
+        output.write((char*)(&opposite_), sizeof(HalfFace));
+    }
+
+
+    void PolyMesh::CellConnectivity::read(std::istream &input) {
+        details::read(input, vertices_);
+        details::read(input, edges_);
+        details::read(input, halffaces_);
+    }
+
+
+    void PolyMesh::CellConnectivity::write(std::ostream &output) const {
+        details::write(output, vertices_);
+        details::write(output, edges_);
+        details::write(output, halffaces_);
+    }
+
+
     PolyMesh::PolyMesh()
     {
         // allocate standard properties
@@ -132,77 +228,89 @@ namespace easy3d {
     //-----------------------------------------------------------------------------
 
 
-    bool PolyMesh::read(const std::string &file_name)
+    bool PolyMesh::read_pmesh(const std::string &file_name)
     {
         clear();
 
-        std::ifstream input(file_name.c_str());
+        // open file (in binary mode)
+        std::ifstream input(file_name.c_str(), std::fstream::binary);
         if (input.fail()) {
             LOG(ERROR) << "could not open file: " << file_name;
             return false;
         }
 
-        std::string dummy;
-        int num_vertices, num_cells;
-        input >> dummy >> num_vertices >> dummy >> num_cells;
+        // how many elements?
+        unsigned int nv, ne, nh, nf, nc;
+        input.read((char*)&nv, sizeof(unsigned int));
+        input.read((char*)&ne, sizeof(unsigned int));
+        input.read((char*)&nf, sizeof(unsigned int));
+        input.read((char*)&nc, sizeof(unsigned int));
+        nh = nf * 2;
 
-        vec3 p;
-        for (std::size_t v = 0; v < num_vertices; ++v) {
-            input >> p;
-            add_vertex(p);
-        }
+        // resize containers
+        resize(nv, ne, nf, nc);
 
-        int num_halffaces, num_valence, idx;
-        for (std::size_t c = 0; c < num_cells; ++c) {
-            input >> num_halffaces;
-            std::vector<PolyMesh::HalfFace> halffaces(num_halffaces);
-            for (std::size_t hf = 0; hf < num_halffaces; ++hf) {
-                input >> num_valence;
-                std::vector<PolyMesh::Vertex> vts(num_valence);
-                for (std::size_t v = 0; v < num_valence; ++v) {
-                    input >> idx;
-                    vts[v] = PolyMesh::Vertex(idx);
-                }
-                halffaces[hf] = add_face(vts);
-            }
-            add_cell(halffaces);
-        }
+        // get properties
+        auto& vconn = vertex_property<PolyMesh::VertexConnectivity>("v:connectivity").vector();
+        auto& econn = edge_property<PolyMesh::EdgeConnectivity>("e:connectivity").vector();
+        auto& hconn = halfface_property<PolyMesh::HalfFaceConnectivity>("h:connectivity").vector();
+        auto& cconn = cell_property<PolyMesh::CellConnectivity>("c:connectivity").vector();
+        auto point = vertex_property<vec3>("v:point");
 
-        return num_vertices > 0 && num_cells > 0;
+        // read properties from file
+        for (unsigned int i=0; i<nv; ++i)   vconn[i].read(input);
+        for (unsigned int i=0; i<ne; ++i)   econn[i].read(input);
+        for (unsigned int i=0; i<nh; ++i)   hconn[i].read(input);
+        for (unsigned int i=0; i<nc; ++i)   cconn[i].read(input);
+        input.read((char*)point.data(), nv * sizeof(vec3));
+
+        return (n_vertices() > 0 && n_faces() > 0 && n_cells() > 0);
     }
 
 
     //-----------------------------------------------------------------------------
 
 
-    bool PolyMesh::write(const std::string &file_name) const {
+    bool PolyMesh::write_pmesh(const std::string& file_name) const
+    {
         if (n_vertices() == 0 || n_faces() == 0 || n_cells() == 0) {
             LOG(ERROR) << "empty polyhedral mesh";
             return false;
         }
 
-        std::ofstream output(file_name.c_str());
+        // open file (in binary mode)
+        std::ofstream output(file_name.c_str(), std::fstream::binary);
         if (output.fail()) {
             LOG(ERROR) << "could not open file: " << file_name;
             return false;
         }
 
-        output << "#vertices " << n_vertices() << std::endl
-               << "#cells    " << n_cells() << std::endl;
+        // how many elements?
+        unsigned int nv, ne, nh, nf, nc;
+        nv = n_vertices();
+        ne = n_edges();
+        nf = n_faces();
+        nh = nf * 2;
+        nc = n_cells();
 
-        for (auto v : vertices())
-            output << position(v) << std::endl;
+        output.write((char*)&nv, sizeof(unsigned int));
+        output.write((char*)&ne, sizeof(unsigned int));
+        output.write((char*)&nf, sizeof(unsigned int));
+        output.write((char*)&nc, sizeof(unsigned int));
 
-        for (auto c : cells()) {
-            int num_halffaces = halffaces(c).size();
-            output << num_halffaces << std::endl;
-            for (auto h : halffaces(c)) {
-                output << vertices(h).size() << " ";
-                for (auto v : vertices(h))
-                    output << v.idx() << " ";
-                output << std::endl;
-            }
-        }
+        // get properties
+        const auto& vconn = get_vertex_property<PolyMesh::VertexConnectivity>("v:connectivity").vector();
+        const auto& econn = get_edge_property<PolyMesh::EdgeConnectivity>("e:connectivity").vector();
+        const auto& hconn = get_halfface_property<PolyMesh::HalfFaceConnectivity>("h:connectivity").vector();
+        const auto& cconn = get_cell_property<PolyMesh::CellConnectivity>("c:connectivity").vector();
+        auto point = get_vertex_property<vec3>("v:point");
+
+        // write properties to file
+        for (unsigned int i=0; i<nv; ++i)   vconn[i].write(output);
+        for (unsigned int i=0; i<ne; ++i)   econn[i].write(output);
+        for (unsigned int i=0; i<nh; ++i)   hconn[i].write(output);
+        for (unsigned int i=0; i<nc; ++i)   cconn[i].write(output);
+        output.write((char*)point.data(), nv * sizeof(vec3));
 
         return true;
     }
@@ -312,28 +420,31 @@ namespace easy3d {
 
 
     PolyMesh::HalfFace PolyMesh::find_half_face(const std::vector<Vertex> &vts) const {
-        auto is_same_set = [](const std::vector<Vertex>& set1, const std::vector<Vertex>& set2) -> bool { // allows permutation
-            if (set1.size() != set2.size())
-                return false;
-            for (std::size_t start=0; start<set1.size(); ++start) {
-                bool found = true;
-                for (std::size_t id = 0; id < set1.size(); ++id) {
-                    if (set1[(id + start) % set1.size()] != set2[id]) {
-                        found = false;
-                        break;
-                    }
-                }
-                if (found)
-                    return true;
-            }
-            return false;
-        };
-
         assert(vts.size() >= 3);
+
+        // loop over all the halffaces that involve the 1st vertex
         for (auto h : halffaces(vts[0])) {
-            if (is_same_set(vertices(h), vts))
-                return h;
+            const auto& tests = vertices(h);
+            if (tests.size() != vts.size())
+                continue;
+
+            // we first find the element (from the first set) to match the 1st element in the second set
+            for (std::size_t start = 0; start < tests.size(); ++start) {
+                if (tests[start] == vts[0]) {
+                    // test for the remaining elements
+                    bool all_matched = true;
+                    for (std::size_t id = 1; id < vts.size(); ++id) { // we can start from 1
+                        if (tests[(id + start) % tests.size()] != vts[id]) {
+                            all_matched = false;
+                            break;
+                        }
+                    }
+                    if (all_matched)
+                        return h;
+                }
+            }
         }
+
         return HalfFace();
     }
 
@@ -353,24 +464,24 @@ namespace easy3d {
         auto f = find_half_face(vertices);
         if (!f.is_valid()) {
             f = new_face();
+            auto op = opposite(f);
             hconn_[f].vertices_ = vertices;
-            hconn_[opposite(f)].vertices_ = std::vector<Vertex>(vertices.rbegin(), vertices.rend());
-        }
+            hconn_[op].vertices_ = std::vector<Vertex>(vertices.rbegin(), vertices.rend());
 
-        for (auto v : vertices) {
-            vconn_[v].halffaces_.insert(f);
-            vconn_[v].halffaces_.insert(opposite(f));
-        }
+            for (int i=0; i<vertices.size(); ++i) {
+                auto s = vertices[i];
+                auto t = vertices[(i+1)%3];
+                auto e = find_edge(s, t);
+                if (!e.is_valid()) {
+                    e = new_edge(s, t);
+                    econn_[e].halffaces_.insert(f);
+                    hconn_[f].edges_.insert(e);
+                    hconn_[op].edges_.insert(e);
+                }
 
-        for (int i=0; i<vertices.size(); ++i) {
-            auto s = vertices[i];
-            auto t = vertices[(i+1)%3];
-            auto e = find_edge(s, t);
-            if (!e.is_valid())
-                e = new_edge(s, t);
-            econn_[e].halffaces_.insert(f);
-            hconn_[f].edges_.insert(e);
-            hconn_[opposite(f)].edges_.insert(e);
+                vconn_[s].halffaces_.insert(f);
+                vconn_[s].halffaces_.insert(op);
+            }
         }
 
         return f;
@@ -410,11 +521,19 @@ namespace easy3d {
 
 
     PolyMesh::Cell PolyMesh::add_tetra(Vertex v0, Vertex v1, Vertex v2, Vertex v3) {
+        // for each face, its normal points inside the cell.
+        // the same as specified in Delaunay3::facet_vertex_
+        //      unsigned int Delaunay3::facet_vertex_[4][3] = {
+        //              {1, 2, 3},
+        //              {0, 3, 2},
+        //              {3, 0, 1},
+        //              {2, 1, 0}
+        //      };
         std::vector<HalfFace> faces = {
-                add_triangle(v0, v1, v2),
-                add_triangle(v1, v3, v2),
-                add_triangle(v0, v2, v3),
-                add_triangle(v1, v0, v3)
+                add_triangle(v1, v2, v3),
+                add_triangle(v0, v3, v2),
+                add_triangle(v3, v0, v1),
+                add_triangle(v2, v1, v0)
         };
 
         return add_cell(faces);
@@ -441,7 +560,7 @@ namespace easy3d {
         }
 
         if (num_degenerate > 0)
-            LOG(WARNING) << "model has " << num_degenerate << " degenerate faces" << std::endl;
+            LOG(WARNING) << "model has " << num_degenerate << " degenerate faces";
     }
 
 

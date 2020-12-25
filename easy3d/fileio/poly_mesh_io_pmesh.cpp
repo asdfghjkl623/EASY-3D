@@ -22,36 +22,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <easy3d/fileio/surface_mesh_io.h>
+#include <easy3d/fileio/poly_mesh_io.h>
 
 #include <iostream>
 #include <fstream>
+#include <set>
 
-#include <easy3d/core/surface_mesh.h>
-
-
-/** ----------------------------------------------------------
- *
- * the code is adapted from Surface_mesh with modifications and
- * significant enhancement.
- *		- Surface_mesh (version 1.1)
- * The original code is available at
- * https://opensource.cit-ec.de/projects/surface_mesh
- *
- * Surface_mesh is a halfedge-based mesh data structure for
- * representing and processing 2-manifold polygonal surface
- * meshes. It is implemented in C++ and designed with an
- * emphasis on simplicity and efficiency.
- *
- *----------------------------------------------------------*/
+#include <easy3d/core/poly_mesh.h>
 
 
 namespace easy3d {
 
     namespace io {
 
-
-        bool load_poly(const std::string& file_name, SurfaceMesh* mesh)
+        bool load_pmesh(const std::string& file_name, PolyMesh* mesh)
         {
             if (!mesh) {
                 LOG(ERROR) << "null mesh pointer";
@@ -66,45 +50,46 @@ namespace easy3d {
             }
 
             // how many elements?
-            unsigned int nv, ne, nh, nf;
+            unsigned int nv, ne, nh, nf, nc;
             input.read((char*)&nv, sizeof(unsigned int));
             input.read((char*)&ne, sizeof(unsigned int));
             input.read((char*)&nf, sizeof(unsigned int));
-            nh = 2*ne;
+            input.read((char*)&nc, sizeof(unsigned int));
+            nh = nf * 2;
 
             // resize containers
-            mesh->resize(nv, ne, nf);
+            mesh->resize(nv, ne, nf, nc);
 
             // get properties
-            auto vconn = mesh->vertex_property<SurfaceMesh::VertexConnectivity>("v:connectivity");
-			auto hconn = mesh->halfedge_property<SurfaceMesh::HalfedgeConnectivity>("h:connectivity");
-			auto fconn = mesh->face_property<SurfaceMesh::FaceConnectivity>("f:connectivity");
-			auto point = mesh->vertex_property<vec3>("v:point");
+            auto& vconn = mesh->vertex_property<PolyMesh::VertexConnectivity>("v:connectivity").vector();
+            auto& econn = mesh->edge_property<PolyMesh::EdgeConnectivity>("e:connectivity").vector();
+            auto& hconn = mesh->halfface_property<PolyMesh::HalfFaceConnectivity>("h:connectivity").vector();
+            auto& cconn = mesh->cell_property<PolyMesh::CellConnectivity>("c:connectivity").vector();
+            auto point = mesh->vertex_property<vec3>("v:point");
 
             // read properties from file
-            input.read((char*)vconn.data(), nv * sizeof(SurfaceMesh::VertexConnectivity)  );
-            input.read((char*)hconn.data(), nh * sizeof(SurfaceMesh::HalfedgeConnectivity));
-            input.read((char*)fconn.data(), nf * sizeof(SurfaceMesh::FaceConnectivity)    );
-            input.read((char*)point.data(), nv * sizeof(vec3)                             );
+            for (unsigned int i=0; i<nv; ++i)   vconn[i].read(input);
+            for (unsigned int i=0; i<ne; ++i)   econn[i].read(input);
+            for (unsigned int i=0; i<nh; ++i)   hconn[i].read(input);
+            for (unsigned int i=0; i<nc; ++i)   cconn[i].read(input);
+            input.read((char*)point.data(), nv * sizeof(vec3));
 
-            bool has_colors = false;
-            input.read((char*)&has_colors, sizeof(bool));
-            if (has_colors) {
-                SurfaceMesh::VertexProperty<vec3> color = mesh->vertex_property<vec3>("v:color");
-                input.read((char*)color.data(), nv * sizeof(vec3));
-            }
-
-            return mesh->n_faces() > 0;
+            return (mesh->n_vertices() > 0 && mesh->n_faces() > 0 && mesh->n_cells() > 0);
         }
 
 
         //-----------------------------------------------------------------------------
 
 
-        bool save_poly(const std::string& file_name, const SurfaceMesh* mesh)
+        bool save_pmesh(const std::string& file_name, const PolyMesh* mesh)
         {
             if (!mesh) {
                 LOG(ERROR) << "null mesh pointer";
+                return false;
+            }
+
+            if (mesh->n_vertices() == 0 || mesh->n_faces() == 0 || mesh->n_cells() == 0) {
+                LOG(ERROR) << "empty polyhedral mesh";
                 return false;
             }
 
@@ -116,36 +101,31 @@ namespace easy3d {
             }
 
             // how many elements?
-            unsigned int nv, ne, nh, nf;
+            unsigned int nv, ne, nh, nf, nc;
             nv = mesh->n_vertices();
             ne = mesh->n_edges();
-            nh = mesh->n_halfedges();
             nf = mesh->n_faces();
-            nh = 2*ne;
+            nh = nf * 2;
+            nc = mesh->n_cells();
 
             output.write((char*)&nv, sizeof(unsigned int));
             output.write((char*)&ne, sizeof(unsigned int));
             output.write((char*)&nf, sizeof(unsigned int));
+            output.write((char*)&nc, sizeof(unsigned int));
 
             // get properties
-			auto vconn = mesh->get_vertex_property<SurfaceMesh::VertexConnectivity>("v:connectivity");
-            auto hconn = mesh->get_halfedge_property<SurfaceMesh::HalfedgeConnectivity>("h:connectivity");
-            auto fconn = mesh->get_face_property<SurfaceMesh::FaceConnectivity>("f:connectivity");
+            const auto& vconn = mesh->get_vertex_property<PolyMesh::VertexConnectivity>("v:connectivity").vector();
+            const auto& econn = mesh->get_edge_property<PolyMesh::EdgeConnectivity>("e:connectivity").vector();
+            const auto& hconn = mesh->get_halfface_property<PolyMesh::HalfFaceConnectivity>("h:connectivity").vector();
+            const auto& cconn = mesh->get_cell_property<PolyMesh::CellConnectivity>("c:connectivity").vector();
             auto point = mesh->get_vertex_property<vec3>("v:point");
 
             // write properties to file
-            output.write((char*)vconn.data(), nv * sizeof(SurfaceMesh::VertexConnectivity));
-            output.write((char*)hconn.data(), nh * sizeof(SurfaceMesh::HalfedgeConnectivity));
-            output.write((char*)fconn.data(), nf * sizeof(SurfaceMesh::FaceConnectivity));
+            for (unsigned int i=0; i<nv; ++i)   vconn[i].write(output);
+            for (unsigned int i=0; i<ne; ++i)   econn[i].write(output);
+            for (unsigned int i=0; i<nh; ++i)   hconn[i].write(output);
+            for (unsigned int i=0; i<nc; ++i)   cconn[i].write(output);
             output.write((char*)point.data(), nv * sizeof(vec3));
-
-            // check for colors
-            auto color = mesh->get_vertex_property<vec3>("v:color");
-            bool has_colors = color;
-            output.write((char*)&has_colors, sizeof(bool));
-            if (has_colors)
-                output.write((char*)color.data(), nv * sizeof(vec3));
-
             return true;
         }
 
