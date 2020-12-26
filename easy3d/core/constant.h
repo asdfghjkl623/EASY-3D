@@ -27,22 +27,19 @@
 
 #include <cfloat>
 #include <climits>
+#include <cmath>
+
 
 namespace easy3d {
 
-    /// \brief The PI.
-    const double pi = 3.14159265358979323846264338327950288;
-    /// \brief The half PI (PI/2)
-    const double half_pi = pi * 0.5;
-    /// \brief The quarter PI (PI/4)
-    const double quarter_pi = pi * 0.25;
-    /// \brief The two PI (2 * PI).
-    const double two_pi	 = pi * 2.0;
+#ifndef M_PI
+#define M_PI			3.14159265358979323846264338327950288
+#endif
 
     /// \brief Conversion from radians to degrees
-    double inline rad2deg(double rad) { return rad * 180.0 / pi; }
+    double inline rad2deg(double rad) { return rad * 180.0 / M_PI; }
     /// \brief Conversion from degrees to radians
-    double inline deg2rad(double deg) { return deg * pi / 180.0; }
+    double inline deg2rad(double deg) { return deg * M_PI / 180.0; }
 
     /// Function returning minimum representable value for a given type
     template <typename FT> inline FT min();
