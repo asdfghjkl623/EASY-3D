@@ -137,39 +137,28 @@ namespace easy3d {
     class KeyFrameInterpolator
     {
     public:
+        /*! Creates a KeyFrameInterpolator, with \p frame as associated frame().
+         * \details The frame() can be set or changed using setFrame().
+         * interpolationTime(), interpolationSpeed() and interpolationPeriod() are set to their default values. */
         KeyFrameInterpolator(Frame* fr=nullptr);
+
+        /*! Virtual destructor. Clears the keyFrame path. */
         virtual ~KeyFrameInterpolator();
-
-//    Q_SIGNALS:
-//        /*! This signal is emitted whenever the frame() state is interpolated.
-
-//        The emission of this signal triggers the synchronous emission of the frame()
-//        Frame::interpolated() signal, which may also be useful.
-
-//        This signal should especially be connected to your QCanvas::update() slot, so that the display
-//        is updated after every update of the KeyFrameInterpolator frame():
-//        \code
-//        connect(myKeyFrameInterpolator, SIGNAL(interpolated()), SLOT(update()));
-//        \endcode
-//        Use the QCanvas::QGLViewerPool() to connect the signal to all the viewers.
-
-//        Note that the QCanvas::camera() QCamera::keyFrameInterpolator() created using QCanvas::pathKey()
-//        have their interpolated() signals automatically connected to the QCanvas::update() slot. */
-//        void interpolated();
-
-//        /*! This signal is emitted when the interpolation reaches the first (when interpolationSpeed()
-//          is negative) or the last keyFrame.
-
-//        When loopInterpolation() is \c true, interpolationTime() is reset and the interpolation
-//        continues. It otherwise stops. */
-//        void endReached();
 
         /*! @name Path creation */
         //@{
     public:
+        /*! Appends a new keyFrame to the path.
+         * Same as addKeyFrame(const Frame& frame, double), except that the keyFrameTime() is automatically set
+         * to previous keyFrameTime() plus one second (or 0.0 if there is no previous keyFrame). */
         void addKeyFrame(const Frame& frame);
+
+        /*! Appends a new keyFrame to the path, with its associated \p time (in seconds).
+         * The path will use the current \p frame state.
+         * \attention The keyFrameTime() have to be monotonously increasing over keyFrames. */
         void addKeyFrame(const Frame& frame, double time);
 
+        /*! Removes all keyFrames from the path. The numberOfKeyFrames() is set to 0. */
         void deletePath();
         //@}
 
@@ -185,18 +174,42 @@ namespace easy3d {
         Frame* frame() const { return frame_; }
 
     public:
+        /*! Sets the frame() associated to the KeyFrameInterpolator. */
         void setFrame(Frame* const frame);
         //@}
 
         /*! @name Path parameters */
         //@{
     public:
-        Frame keyFrame(int index) const;
-        double keyFrameTime(int index) const;
         /*! Returns the number of keyFrames used by the interpolation. Use addKeyFrame() to add new keyFrames. */
-        std::size_t numberOfKeyFrames() const { return keyFrame_.size(); }
+        std::size_t numberOfKeyFrames() const { return keyFrames_.size(); }
+
+        /**
+         * \brief Returns the Frame associated with the keyFrame at index \p index.
+         * See also keyFrameTime(). \p index has to be in the range [0, numberOfKeyFrames()-1].
+         * \note If this keyFrame was defined using a pointer to a Frame (see addKeyFrame(const Frame* const)),
+         *      the \e current pointed Frame state is returned.
+         */
+        Frame keyFrame(int index) const;
+
+        /*! Returns the time corresponding to the \p index keyFrame.
+         * See also keyFrame(). \p index has to be in the range [0, numberOfKeyFrames()-1].
+         */
+        double keyFrameTime(int index) const;
+
+        /*! Returns the duration of the KeyFrameInterpolator path, expressed in seconds.
+         * Simply corresponds to lastTime() - firstTime(). Returns 0.0 if the path has less than 2 keyFrames.
+         * \sa keyFrameTime(). */
         double duration() const;
+
+        /*! Returns the time corresponding to the first keyFrame, expressed in seconds.
+         * Returns 0.0 if the path is empty.
+         * \sa lastTime(), duration() and keyFrameTime(). */
         double firstTime() const;
+
+        /*! Returns the time corresponding to the last keyFrame, expressed in seconds.
+         * Returns 0.0 if the path is empty.
+         * \sa firstTime(), duration() and keyFrameTime(). */
         double lastTime() const;
         //@}
 
@@ -235,14 +248,7 @@ namespace easy3d {
 
         In both cases, the endReached() signal is emitted. */
         bool loopInterpolation() const { return loopInterpolation_; }
-    #ifndef DOXYGEN
-        /*! Whether or not (default) the path defined by the keyFrames is a closed loop. When \c true,
-        the last and the first KeyFrame are linked by a new spline segment.
 
-        Use setLoopInterpolation() to create a continuous animation over the entire path.
-        \attention The closed path feature is not yet implemented. */
-        bool closedPath() const { return closedPath_; }
-    #endif
     public:
         /*! Sets the interpolationTime().
 
@@ -256,12 +262,7 @@ namespace easy3d {
         void setInterpolationPeriod(int period) { period_ = period; }
         /*! Sets the loopInterpolation() value. */
         void setLoopInterpolation(bool loop=true) { loopInterpolation_ = loop; }
-    #ifndef DOXYGEN
-        /*! Sets the closedPath() value. \attention The closed path feature is not yet implemented. */
-        void setClosedPath(bool closed=true) { closedPath_ = closed; }
-    #endif
         //@}
-
 
         /*! @name Interpolation */
         //@{
@@ -270,18 +271,72 @@ namespace easy3d {
         stopInterpolation() or toggleInterpolation() to modify this state. */
         bool interpolationIsStarted() const { return interpolationStarted_; }
     public:
+
+        /*! Starts the interpolation process.
+         *
+         * A timer is started with an interpolationPeriod() period that updates the frame()'s position and
+         * orientation. interpolationIsStarted() will return \c true until stopInterpolation() or
+         * toggleInterpolation() is called.
+         *
+         * If \p period is positive, it is set as the new interpolationPeriod(). The previous interpolationPeriod() is
+         * used otherwise (default).
+         *
+         * If interpolationTime() is larger than lastTime(), interpolationTime() is reset to firstTime() before
+         * interpolation starts (and inversely for negative interpolationSpeed()).
+         *
+         * Use setInterpolationTime() before calling this method to change the starting interpolationTime().
+         *
+         * \attention The keyFrames must be defined (see addKeyFrame()) \e before you startInterpolation(), or else
+         * the interpolation will naturally immediately stop. */
         void startInterpolation(int period = -1);
+
+        /*! Stops an interpolation started with startInterpolation().
+         * \sa startInterpolation(), interpolationIsStarted(), and toggleInterpolation(). */
         void stopInterpolation();
+
+        /*! Stops the interpolation and resets interpolationTime() to the firstTime().
+         * If desired, call interpolateAtTime() after this method to actually move the frame() to firstTime(). */
         void resetInterpolation();
+
         /*! Calls startInterpolation() or stopInterpolation(), depending on interpolationIsStarted(). */
         void toggleInterpolation() { if (interpolationIsStarted()) stopInterpolation(); else startInterpolation(); }
+
+        /*! Interpolate frame() at time \p time (expressed in seconds). interpolationTime() is set
+         * to \p time and frame() is set accordingly.
+         *
+         * If you simply want to change interpolationTime() but not the frame() state, use setInterpolationTime()
+         * instead.  */
         virtual void interpolateAtTime(double time);
         //@}
 
         /*! @name Path drawing */
         //@{
     public:
+        /*! Draws the path used to interpolate the frame().
+         *
+         * \p mask controls what is drawn: if (mask & 1) (default), the position path is drawn. If (mask & 2),
+         * a camera representation is regularly drawn and if (mask & 4), an oriented axis is regularly drawn.
+         * Examples:
+         *      \code
+         *      drawPath();  // Simply draws the interpolation path
+         *      drawPath(3); // Draws path and cameras
+         *      drawPath(5); // Draws path and axis
+         *      \endcode
+         *
+         * In the case where camera or axis is drawn, \p nbFrames controls the number of objects (axis or
+         * camera) drawn between two successive keyFrames. When \p nbFrames=1, only the path KeyFrames are
+         * drawn. \p nbFrames=2 also draws the intermediate orientation, etc. The maximum value is 30. \p
+         * nbFrames should divide 30 so that an object is drawn for each KeyFrame. Default value is 6.
+         *
+         * \p scale (default=1.0) controls the scaling of the camera and axis drawing. A value of
+         * Canvas::sceneRadius() should give good results.
+         *
+         * The rendering state can be changes by calling the path/cameras drawable's related methods. */
         virtual void drawPath(const Camera* cam, int mask=1, int nbFrames=6, float scale=1.0);
+
+        /// adjusts the scene radius so that the entire camera path is within the view frustum.
+        /// \related The adjusted scene radius.
+        double adjust_scene_radius(Camera* cam) const;
         //@}
 
     private:
@@ -289,7 +344,7 @@ namespace easy3d {
         virtual void on_frame_modified() { valuesAreValid_ = false; pathIsValid_ = false; splineCacheIsValid_ = false; }
 
     private:
-        // Copy constructor and opertor= are declared private and undefined
+        // Copy constructor and operator= are declared private and undefined
         // Prevents everyone from trying to use them
          KeyFrameInterpolator(const KeyFrameInterpolator& kfi);
          KeyFrameInterpolator& operator=(const KeyFrameInterpolator& kfi);
@@ -318,30 +373,28 @@ namespace easy3d {
             double time_;
         };
 
-
     #endif
 
-        // K e y F r a m e s
-        mutable std::vector<KeyFrame*> keyFrame_;
+        // Key Frames
+        mutable std::vector<KeyFrame*> keyFrames_;
         std::vector<Frame> path_;
 
         std::vector<KeyFrame*>::iterator currentFrame_[4];
 
-        // A s s o c i a t e d   f r a m e
+        // Associated frame
         Frame* frame_;
 
-        // R h y t h m
+        // Rhythm
         Timer timer_;
         int period_;
         double interpolationTime_;
         double interpolationSpeed_;
         bool interpolationStarted_;
 
-        // M i s c
-        bool closedPath_;
+        // Make a loop?
         bool loopInterpolation_;
 
-        // C a c h e d   v a l u e s   a n d   f l a g s
+        // Cached values and flags
         bool pathIsValid_;
         bool valuesAreValid_;
         bool currentFrameValid_;
