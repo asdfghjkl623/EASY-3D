@@ -34,6 +34,7 @@
 #include <QLabel>
 
 #include <easy3d/util/progress.h>
+#include <easy3d/util/logging.h>
 #include <easy3d/core/types.h>
 
 
@@ -50,7 +51,7 @@ class WidgetPointsDrawable;
 class WidgetLinesDrawable;
 class WidgetTrianglesDrawable;
 
-class MainWindow : public QMainWindow, public easy3d::ProgressClient
+class MainWindow : public QMainWindow, public easy3d::ProgressClient, public easy3d::logging::LogClient
 {
     Q_OBJECT
 
@@ -67,7 +68,7 @@ public:
 
     void setShowSelectedOnly(bool b);
 
-    void showPointUnderMouse(const easy3d::vec3& p, bool found);
+    void setPointUnderMouse(const QString& text);
 
 public slots:
     void enableCameraManipulation();
@@ -83,6 +84,8 @@ private slots:
     // view
     void saveSnapshot();
     void setBackgroundColor();
+
+    // camera
     void saveCameraStateToFile();
     void restoreCameraStateFromFile();
     void importCameraPathFromFile();
@@ -165,8 +168,9 @@ private:
 private:
     void createActionsForFileMenu();
     void createActionsForViewMenu();
-    void createActionsForEditMenu();
+    void createActionsForCameraMenu();
     void createActionsForPropertyMenu();
+    void createActionsForEditMenu();
     void createActionsForSelectMenu();
     void createActionsForPointCloudMenu();
     void createActionsForSurfaceMeshMenu();
@@ -182,7 +186,8 @@ private:
     void updateRecentFileActions();
     QString strippedName(const QString &fullFileName);
 
-    void notify(std::size_t value, bool show_text = true, bool update_viewer = true) override ;
+    void notify(std::size_t value, bool show_text = true, bool update_viewer = true) override;
+    void output(int severity, const std::string &message) override;
 
 private:
     PaintCanvas*   viewer_;
