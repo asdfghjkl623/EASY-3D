@@ -40,7 +40,9 @@
 
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/transform.h>
+#include <easy3d/core//model.h>
 #include <easy3d/util/logging.h>
+#include <easy3d/util/file_system.h>
 #include <easy3d/util/progress.h>
 
 
@@ -198,4 +200,81 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
     progress.done();
 
     return saved;
+}
+
+
+#include <QFileInfo>
+#include <QFileDialog>
+
+#include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/key_frame_interpolator.h>
+
+
+// true to start the recording and false to stop the recording.
+bool PaintCanvas::recordAnimation(bool b) {
+    auto kfi = walkThrough()->interpolator();
+    if (kfi->numberOfKeyFrames() == 0) {
+        if (b)
+            LOG(WARNING) << "recording aborted (camera path is empty). You may import a camera path from a file or"
+                            " creat it by adding key frames";
+        window_->stopRecordAnimation();
+        return false;
+    }
+
+    // must be static because of the lambda function called in the animation thread
+    static QString recordDir;
+    static int snapshotCounter = 0;
+    static QMetaObject::Connection connection;
+
+    auto snapshotFramebuffer = [&]() -> void {
+        const QString count = QString("%1").arg(snapshotCounter++, 4, 10,QChar('0'));
+        const QString fileName = recordDir +  QString("/snapshot-") + count + QString(".png");
+        raise(); // to correctly grab the frame buffer, the viewer window must be raised in front of other windows
+        const QImage snapshot = grabFramebuffer();
+        if (!snapshot.save(fileName, "png"))
+            LOG(WARNING) << "unable to save snapshot in " << fileName.toStdString();
+    };
+
+    auto interpolationFinished = [this]() -> void { emit recordingFinished(); };
+
+    if (b) {
+        std::string model_dir = file_system::parent_directory(currentModel()->name());
+        recordDir = QFileDialog::getExistingDirectory(
+                this, tr("Please choose a directory"), QString::fromStdString(model_dir)
+        );
+        if (recordDir.isEmpty()) {
+            window_->stopRecordAnimation();
+            return false;
+        }
+
+        snapshotCounter = 0;
+        connection = QObject::connect(this, &PaintCanvas::drawFinished, snapshotFramebuffer);
+
+#if 0
+        // Liangliang: MainWindow::stopRecordAnimation will be called from the animation thread, which causes the
+        //             error: "QObject::startTimer: Timers cannot be started from another thread". To workaround,
+        //             I invoke MainWindow::stopRecordAnimation by a viewer signal.
+//        easy3d::connect(kfi, window_, &MainWindow::stopRecordAnimation);
+#else
+        easy3d::connect(&kfi->end_reached, 0, interpolationFinished);
+        QObject::connect(this, &PaintCanvas::recordingFinished, window_, &MainWindow::stopRecordAnimation);
+#endif
+
+        if (kfi->interpolationIsStarted()) // stop first if is playing now
+            kfi->stopInterpolation();
+        playCameraPath();
+        LOG(INFO) << "recording animation started...";
+    }
+    else {
+        QObject::disconnect(connection);
+        easy3d::disconnect(&kfi->end_reached, 0);
+        QObject::disconnect(this, &PaintCanvas::recordingFinished, window_, &MainWindow::stopRecordAnimation);
+
+        if (kfi->interpolationIsStarted())
+            kfi->stopInterpolation();
+
+        LOG(INFO) << "recording animation finished. " << snapshotCounter << " snapshots recorded";
+    }
+
+    return true;
 }

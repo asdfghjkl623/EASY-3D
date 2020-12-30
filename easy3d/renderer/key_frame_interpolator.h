@@ -38,6 +38,7 @@
 #define EASY3D_RENDERER_KEY_FRAME_INTERPOLATOR_H
 
 #include <easy3d/core/types.h>
+#include <easy3d/core/signal.h>
 #include <easy3d/util/timer.h>
 
 #include <vector>
@@ -324,9 +325,17 @@ namespace easy3d {
         double adjust_scene_radius(Camera* cam) const;
         //@}
 
+        /*! @name File io */
+        //@{
+    public:
+        /// saves the camera path to a file
+        void save_path(const std::string& file_name) const;
+        /// reads camera path from a file
+        void read_path(const std::string& file_name);
+        //@}
+
     private:
         virtual void update();
-        virtual void on_frame_modified() { valuesAreValid_ = false; pathIsValid_ = false; splineCacheIsValid_ = false; }
 
     private:
         // Copy constructor and operator= are declared private and undefined
@@ -388,6 +397,9 @@ namespace easy3d {
 
         LinesDrawable* path_drawable_;
         LinesDrawable* cameras_drawable_;
+
+    public:
+        Signal end_reached;
     };
 
 }

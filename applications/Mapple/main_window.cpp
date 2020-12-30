@@ -47,6 +47,7 @@
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/clipping_plane.h>
+#include <easy3d/renderer/walk_throuth.h>
 #include <easy3d/renderer/drawable_triangles.h>
 #include <easy3d/fileio/point_cloud_io.h>
 #include <easy3d/fileio/graph_io.h>
@@ -89,6 +90,7 @@
 #include "dialogs/dialog_surface_mesh_remeshing.h"
 #include "dialogs/dialog_surface_mesh_smoothing.h"
 #include "dialogs/dialog_surface_mesh_simplification.h"
+#include "dialogs/dialog_walk_through.h"
 
 #include "widgets/widget_global_setting.h"
 #include "widgets/widget_drawable_points.h"
@@ -218,8 +220,8 @@ void MainWindow::notify(std::size_t value, bool show_text, bool update_viewer) {
 
 
 void MainWindow::output(int severity, const std::string &message) {
-//    static QMutex mutex;
-//    mutex.lock();
+    static QMutex mutex;
+    mutex.lock();
     std::string line("");
 	switch (severity) {
         case 0:
@@ -241,7 +243,7 @@ void MainWindow::output(int severity, const std::string &message) {
     }
 
     ui->listWidgetLog->scrollToBottom();
-//	mutex.unlock();
+	mutex.unlock();
 }
 
 
@@ -863,6 +865,10 @@ void MainWindow::createActionsForViewMenu() {
     connect(ui->actionShowFaceVertexLabelsUnderMouse, SIGNAL(toggled(bool)), viewer_, SLOT(showFaceVertexLabelsUnderMouse(bool)));
     connect(ui->actionShowCordinatesUnderMouse, SIGNAL(toggled(bool)), viewer_, SLOT(showCordinatesUnderMouse(bool)));
 
+    connect(ui->actionShowEasy3DLogo, SIGNAL(toggled(bool)), viewer_, SLOT(showEasy3DLogo(bool)));
+    connect(ui->actionShowFrameRate, SIGNAL(toggled(bool)), viewer_, SLOT(showFrameRate(bool)));
+    connect(ui->actionShowAxes, SIGNAL(toggled(bool)), viewer_, SLOT(showAxes(bool)));
+
     QAction* actionToggleDockWidgetRendering = ui->dockWidgetRendering->toggleViewAction();
     actionToggleDockWidgetRendering->setText("Rendering Panel");
     ui->menuView->addAction(actionToggleDockWidgetRendering);
@@ -880,6 +886,7 @@ void MainWindow::createActionsForViewMenu() {
 
 
 void MainWindow::createActionsForCameraMenu() {
+    connect(ui->actionPerspectiveOrthographic, SIGNAL(toggled(bool)), viewer_, SLOT(setPerspective(bool)));
     connect(ui->actionSnapshot, SIGNAL(triggered()), this, SLOT(saveSnapshot()));
 
     connect(ui->actionCopyCamera, SIGNAL(triggered()), viewer_, SLOT(copyCamera()));
@@ -892,6 +899,9 @@ void MainWindow::createActionsForCameraMenu() {
 
     connect(ui->actionAddKeyFrame, SIGNAL(triggered()), viewer_, SLOT(addKeyFrame()));
     connect(ui->actionPlayCameraPath, SIGNAL(triggered()), viewer_, SLOT(playCameraPath()));
+
+    connect(ui->actionRecordAnimation, SIGNAL(toggled(bool)), this, SLOT(recordAnimation(bool)));
+    connect(ui->actionWalkThrough, SIGNAL(triggered()), this, SLOT(setupWalkThrough()));
 
     connect(ui->actionImportCameraPathFromFile, SIGNAL(triggered()), this, SLOT(importCameraPathFromFile()));
     connect(ui->actionExportCamaraPathToFile, SIGNAL(triggered()), this, SLOT(exportCamaraPathToFile()));
@@ -1859,6 +1869,34 @@ void MainWindow::surfaceMeshParameterization() {
     if (!dialog)
         dialog = new DialogSurfaceMeshParameterization(this);
     dialog->show();
+}
+
+
+void MainWindow::setupWalkThrough() {
+    static DialogWalkThrough* dialog = nullptr;
+    if (!dialog)
+        dialog = new DialogWalkThrough(this);
+
+    dialog->walkThrough()->start_walking(viewer_->models());
+    dialog->show();
+    if (!ui->actionShowCamaraPath->isChecked())
+        ui->actionShowCamaraPath->setChecked(true);
+}
+
+
+void MainWindow::recordAnimation(bool b) {
+    if (viewer_->recordAnimation(b)) {
+        for (auto action : ui->menuCamera->actions()) {
+            if (action != ui->actionRecordAnimation)
+                action->setEnabled(!b);
+        }
+    }
+}
+
+
+void MainWindow::stopRecordAnimation() {
+    if (ui->actionRecordAnimation->isChecked())
+        ui->actionRecordAnimation->setChecked(false);
 }
 
 

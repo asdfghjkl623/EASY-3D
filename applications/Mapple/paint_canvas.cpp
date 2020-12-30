@@ -52,7 +52,7 @@
 #include <easy3d/renderer/clipping_plane.h>
 #include <easy3d/renderer/texture_manager.h>
 #include <easy3d/renderer/text_renderer.h>
-#include <easy3d/renderer/buffers.h>
+#include <easy3d/renderer/walk_throuth.h>
 #include <easy3d/fileio/resources.h>
 #include <easy3d/gui/picker_surface_mesh.h>
 #include <easy3d/util/file_system.h>
@@ -76,6 +76,8 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , window_(window)
         , func_(nullptr)
         , texter_(nullptr)
+        , show_easy3d_logo_(true)
+        , show_frame_rate_(true)
         , dpi_scaling_(1.0)
         , samples_(0)
         , camera_(nullptr)
@@ -87,7 +89,6 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , pressed_key_(-1)
         , show_pivot_point_(false)
         , drawable_axes_(nullptr)
-        , show_camera_path_(false)
         , show_labels_under_mouse_(false)
         , picked_face_index_(-1)
         , show_coordinates_under_mouse_(false)
@@ -106,9 +107,10 @@ PaintCanvas::PaintCanvas(MainWindow* window)
     camera_->setUpVector(vec3(0, 0, 1)); // Z pointing up
     camera_->setViewDirection(vec3(-1, 0, 0)); // X pointing out
     camera_->showEntireScene();
-    camera_->connect(this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));
 
-    kfi_ = new KeyFrameInterpolator(camera_->frame());
+    easy3d::connect(&camera_->frame_modified, this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));
+
+    walk_through_ = new WalkThrough(camera_);
 }
 
 
@@ -130,7 +132,7 @@ void PaintCanvas::cleanup() {
     }
 
     delete camera_;
-    delete kfi_;
+    delete walk_through_;
     delete drawable_axes_;
     delete ssao_;
     delete shadow_;
@@ -229,6 +231,26 @@ void PaintCanvas::setBackgroundColor(const vec4 &c) {
 }
 
 
+void PaintCanvas::showEasy3DLogo(bool b) {
+    show_easy3d_logo_ = b;
+    update();
+}
+
+
+void PaintCanvas::showFrameRate(bool b) {
+    show_frame_rate_ = b;
+    update();
+}
+
+
+void PaintCanvas::showAxes(bool b) {
+    if (drawable_axes_) {
+        drawable_axes_->set_visible(b);
+        update();
+    }
+}
+
+
 void PaintCanvas::mousePressEvent(QMouseEvent *e) {
     pressed_button_ = e->button();
     modifiers_ = e->modifiers();
@@ -275,6 +297,14 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
                 show_pivot_point_ = false;
                 if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
                     camera()->interpolateToFitScene();
+            }
+        }
+
+        if (e->modifiers() == Qt::ControlModifier) {
+            bool found = false;
+            const vec3 p = pointUnderPixel(e->pos(), found);
+            if (found && !walkThrough()->interpolator()->interpolationIsStarted()) {
+                walkThrough()->walk_to(p);
             }
         }
     }
@@ -351,7 +381,7 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
 
 void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
     int x = e->pos().x(), y = e->pos().y();
-    if (x < 0 || x > width() || y < 0 || y > height()) {
+    if (x < 0 || x > width() || y < 0 || y > height() || walkThrough()->interpolator()->interpolationIsStarted()) {
         e->ignore();
         return;
     }
@@ -496,19 +526,11 @@ void PaintCanvas::keyPressEvent(QKeyEvent *e) {
                e->modifiers() == (Qt::KeypadModifier | Qt::ControlModifier)) {    // move camera down
         float step = 0.05f * camera_->sceneRadius();
         camera_->frame()->translate(camera_->frame()->inverseTransformOf(vec3(0.0, -step, 0.0)));
-    } else if (e->key() == Qt::Key_A && e->modifiers() == Qt::NoModifier) {
-        if (drawable_axes_)
-            drawable_axes_->set_visible(!drawable_axes_->is_visible());
     } else if (e->key() == Qt::Key_C && e->modifiers() == Qt::NoModifier) {
         if (currentModel())
             fitScreen(currentModel());
     } else if (e->key() == Qt::Key_F && e->modifiers() == Qt::NoModifier) {
         fitScreen();
-    } else if (e->key() == Qt::Key_P && e->modifiers() == Qt::NoModifier) {
-        if (camera_->type() == Camera::PERSPECTIVE)
-            camera_->setType(Camera::ORTHOGRAPHIC);
-        else
-            camera_->setType(Camera::PERSPECTIVE);
     } else if (e->key() == Qt::Key_Space && e->modifiers() == Qt::NoModifier) {
         // Aligns camera
         Frame frame;
@@ -745,13 +767,9 @@ std::string PaintCanvas::usage() const {
             " ------------------------------------------------------------------\n"
             "  F1:                  Help                                        \n"
             " ------------------------------------------------------------------\n"
-            "  Ctrl + 'o':          Open file                                   \n"
-            "  Ctrl + 's':          Save file                                   \n"
             "  Fn + Delete:         Delete current model                        \n"
             "  '<' or '>':          Switch between models                       \n"
-            "  's':                 Snapshot                                    \n"
             " ------------------------------------------------------------------\n"
-            "  'p':                 Toggle perspective/orthographic projection)	\n"
             "  Left mouse:          Orbit-rotate the camera                     \n"
             "  Right mouse:         Pan-move the camera                         \n"
             "  'x' + Left mouse:    Orbit-rotate the camera (screen based)      \n"
@@ -773,7 +791,6 @@ std::string PaintCanvas::usage() const {
             " ------------------------------------------------------------------\n"
             "  '-'/'=':             Decrease/Increase point size                \n"
             "  '{'/'}':             Decrease/Increase line width                \n"
-            "  'a':                 Toggle axes									\n"
             "  'b':                 Toggle borders								\n"
             "  'e':                 Toggle edges							    \n"
             "  'v':                 Toggle vertices                             \n"
@@ -935,6 +952,8 @@ void PaintCanvas::paintGL() {
 
     // Add visual hints: axis, camera, grid...
     postDraw();
+
+    Q_EMIT drawFinished();
 }
 
 
@@ -1074,13 +1093,14 @@ void PaintCanvas::preDraw() {
 void PaintCanvas::postDraw() {
     easy3d_debug_log_gl_error;
 
-    // draw the Easy3D logo and GPU time
-    if (texter_ && texter_->num_fonts() >=2)
-    {
+    // draw the Easy3D logo and frame rate
+    if (show_easy3d_logo_ && texter_ && texter_->num_fonts() >=2) {
         const float font_size = 15.0f;
         const float offset = 20.0f * dpi_scaling();
         texter_->draw("Easy3D", offset, offset, font_size, 0);
+    }
 
+    if (show_frame_rate_) {
         // FPS computation
         static unsigned int fpsCounter = 0;
         static double fps = 0.0;
@@ -1108,8 +1128,8 @@ void PaintCanvas::postDraw() {
     }
 
     // shown only when it is not animating
-    if (show_camera_path_ && !kfi_->interpolationIsStarted())
-        kfi_->draw_path(camera());
+    if (walk_through_ && walk_through_->is_path_visible() && !walk_through_->interpolator()->interpolationIsStarted())
+        walk_through_->draw();
     easy3d_debug_log_gl_error;
 
     if (show_pivot_point_) {
@@ -1262,6 +1282,15 @@ void PaintCanvas::deleteSelectedPrimitives() {
 }
 
 
+void PaintCanvas::setPerspective(bool b) {
+    if (b)
+        camera_->setType(Camera::PERSPECTIVE);
+    else
+        camera_->setType(Camera::ORTHOGRAPHIC);
+    update();
+}
+
+
 void PaintCanvas::copyCamera() {
     if (camera()->frame()) {
         const vec3 pos = camera()->position();
@@ -1280,6 +1309,9 @@ void PaintCanvas::copyCamera() {
 
 
 void PaintCanvas::pasteCamera() {
+    if (walkThrough()->interpolator()->interpolationIsStarted())
+        return;
+
     // get the camera parameters from clipboard string
     const QString str = qApp->clipboard()->text();
     const QStringList list = str.split(" ", QString::SkipEmptyParts);
@@ -1349,7 +1381,7 @@ void PaintCanvas::saveStateToFile(const std::string& file_name) const {
     //-----------------------------------------------------
 
     output << "<display>" << std::endl;
-    output << "\t cameraPathIsDrawn: " << show_camera_path_ << std::endl;
+    output << "\t cameraPathIsDrawn: " << walk_through_->is_path_visible() << std::endl;
     output << "</display>" << std::endl << std::endl;
 
     //-----------------------------------------------------
@@ -1426,14 +1458,16 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
 
     //-----------------------------------------------------
 
+    bool status = false;
     input >> dummy;	// this skips the keyword
-    input >> dummy >> show_camera_path_;
+    input >> dummy >> status;
+    walk_through_->set_path_visible(status);
     input >> dummy;	// this skips the keyword
 
     //-----------------------------------------------------
 
     input >> dummy;	// this skips the keyword
-    int state;
+    int state = -1;
     input >> dummy >> state;
     window()->setWindowState(Qt::WindowState(state));
     if (Qt::WindowState(state) == Qt::WindowNoState) {
@@ -1448,7 +1482,8 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
 
     input >> dummy;	// this skips the keyword
 
-//    disConnectAllCameraKFIInterpolatedSignals();
+    // don't allow modify view when the camera parameters are changing.
+    easy3d::disconnect(&camera_->frame_modified, this);
 
     std::string t;
     input >> dummy >> t;
@@ -1456,7 +1491,6 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
         camera()->setType(Camera::PERSPECTIVE);
     else if (t == "ORTHOGRAPHIC")
         camera()->setType(Camera::ORTHOGRAPHIC);
-
 
     float v;
     vec3 p;
@@ -1466,10 +1500,8 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
     input >> dummy >> v;	camera()->setSceneRadius(v);
     input >> dummy >> v;	camera()->setFieldOfView(v);
     input >> dummy >> p;	camera()->setSceneCenter(p);
-//    connectAllCameraKFIInterpolatedSignals();
 
     // ManipulatedCameraFrame
-    bool status;
     input >> dummy >> p;	camera()->frame()->setPosition(p);
     input >> dummy >> q;	camera()->frame()->setOrientation(q);
     input >> dummy >> v;	camera()->frame()->setWheelSensitivity(v);
@@ -1479,6 +1511,9 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
     input >> dummy >> status;	camera()->frame()->setZoomsOnPivotPoint(status);
     input >> dummy >> p;	camera()->frame()->setPivotPoint(p);
     input >> dummy;	// this skips the keyword
+
+    // now camera parameters are all up-to-date, enable updating the rendering
+    easy3d::connect(&camera_->frame_modified, this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));
 
     // The Camera always stores its "real" zClippingCoef in file. If it is edited,
     // its "real" coef must be saved and the coef set to 5.0, as is done in setCameraIsEdited().
@@ -1497,98 +1532,70 @@ void PaintCanvas::restoreStateFromFile(const std::string& file_name) {
 
 void PaintCanvas::addKeyFrame() {
     easy3d::Frame *frame = camera()->frame();
-    kfi_->addKeyFrame(*frame);
-    kfi_->adjust_scene_radius(camera());
-    LOG(INFO) << "key frame added to camera path";
+    walk_through_->add_key_frame(*frame);
     update();
 }
 
 
 void PaintCanvas::playCameraPath() {
-    if (kfi_->interpolationIsStarted())
-        kfi_->stopInterpolation();
+    if (walk_through_->interpolator()->numberOfKeyFrames() == 0) {
+        LOG(WARNING) << "camera path is empty. You may import a camera path from a file or creat it by adding key frames";
+        return;
+    }
+
+    if (walk_through_->interpolator()->interpolationIsStarted())
+        walk_through_->interpolator()->stopInterpolation();
     else
-        kfi_->startInterpolation();
+        walk_through_->interpolator()->startInterpolation();
 }
 
 
 void PaintCanvas::showCamaraPath(bool b) {
-    show_camera_path_ = b;
-
-    if (show_camera_path_)
-        kfi_->adjust_scene_radius(camera());
+    walk_through_->set_path_visible(b);
+    if (b)
+        walk_through_->interpolator()->adjust_scene_radius(camera());
     else {
         Box3 box;
         for (auto m : models_)
             box.add_box(m->bounding_box());
         camera_->setSceneBoundingBox(box.min(), box.max());
     }
-
     update();
 }
 
 
 void PaintCanvas::exportCamaraPathToFile(const std::string& file_name) const {
-    if (!kfi_)
-        return;
-
-    std::ofstream output(file_name.c_str());
-    if (output.fail()) {
-        std::cerr << "unable to open \'" << file_name << "\'" << std::endl;
-        return;
-    }
-
-    std::size_t num = kfi_->numberOfKeyFrames();
-    output << "\tnum_key_frames: " << num << std::endl;
-
-    for (std::size_t j = 0; j < num; ++j) {
-        output << "\tframe: " << j << std::endl;
-        const Frame &frame = kfi_->keyFrame(j);
-        output << "\t\tposition: " << frame.position() << std::endl;
-        output << "\t\torientation: " << frame.orientation() << std::endl;
-    }
+    if (walk_through_)
+        walk_through_->interpolator()->save_path(file_name);
 }
 
 
 void PaintCanvas::importCameraPathFromFile(const std::string& file_name) {
-    std::ifstream input(file_name.c_str());
-    if (input.fail()) {
-        std::cerr << "unable to open \'" << file_name << "\'" << std::endl;
-        return;
+    if (walk_through_) {
+        walk_through_->interpolator()->read_path(file_name);
+        if (walk_through_->is_path_visible())
+            walk_through_->interpolator()->adjust_scene_radius(camera());
+
+        // move to the beginning view point
+        walk_through_->interpolator()->interpolateAtTime(0);
+
+        update();
     }
-
-    // clean
-    kfi_->deletePath();
-
-    // load path from file
-    std::string dummy;
-    int num_key_frames;
-    input >> dummy >> num_key_frames;
-    for (int j = 0; j < num_key_frames; ++j) {
-        int frame_id;
-        input >> dummy >> frame_id;
-        vec3 pos;
-        quat orient;
-        input >> dummy >> pos >> dummy >> orient;
-        kfi_->addKeyFrame(Frame(pos, orient));
-    }
-
-    if (show_camera_path_)
-        kfi_->adjust_scene_radius(camera());
-
-    update();
 }
 
 
 void PaintCanvas::deleteCameraPath() {
-    kfi_->deletePath();
-    // update scene bounding box
-    Box3 box;
-    for (auto m : models_)
-        box.add_box(m->bounding_box());
-    camera_->setSceneBoundingBox(box.min(), box.max());
-    update();
-    LOG(INFO) << "camera path deleted";
+    if (walk_through_) {
+        walk_through_->interpolator()->deletePath();
+
+        // update scene bounding box
+        Box3 box;
+        for (auto m : models_)
+            box.add_box(m->bounding_box());
+        camera_->setSceneBoundingBox(box.min(), box.max());
+        update();
+        LOG(INFO) << "camera path deleted";
+    }
 }
 
 
