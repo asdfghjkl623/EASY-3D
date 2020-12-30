@@ -28,6 +28,7 @@
 #include <string>
 #include <iostream>
 
+#include <QMutex>
 #include <QFileDialog>
 #include <QDropEvent>
 #include <QMimeData>
@@ -895,8 +896,7 @@ void MainWindow::createActionsForCameraMenu() {
     connect(ui->actionSaveCameraStateToFile, SIGNAL(triggered()), this, SLOT(saveCameraStateToFile()));
     connect(ui->actionRestoreCameraStateFromFile, SIGNAL(triggered()), this, SLOT(restoreCameraStateFromFile()));
 
-    connect(ui->actionShowCamaraPath, SIGNAL(toggled(bool)), viewer_, SLOT(showCamaraPath(bool)));
-
+    connect(ui->actionShowCameraPath, SIGNAL(toggled(bool)), viewer_, SLOT(showCameraPath(bool)));
     connect(ui->actionAddKeyFrame, SIGNAL(triggered()), viewer_, SLOT(addKeyFrame()));
     connect(ui->actionPlayCameraPath, SIGNAL(triggered()), viewer_, SLOT(playCameraPath()));
 
@@ -1879,8 +1879,8 @@ void MainWindow::setupWalkThrough() {
 
     dialog->walkThrough()->start_walking(viewer_->models());
     dialog->show();
-    if (!ui->actionShowCamaraPath->isChecked())
-        ui->actionShowCamaraPath->setChecked(true);
+    if (!ui->actionShowCameraPath->isChecked())
+        ui->actionShowCameraPath->setChecked(true);
 }
 
 
