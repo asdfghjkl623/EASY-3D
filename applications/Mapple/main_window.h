@@ -88,11 +88,8 @@ public slots:
     // camera
     void saveCameraStateToFile();
     void restoreCameraStateFromFile();
-    void importCameraPathFromFile();
-    void exportCamaraPathToFile();
-    void setupWalkThrough();
-    void recordAnimation(bool);
-    void stopRecordAnimation();
+
+    void animation();
 
     // property
     void manipulateProperties();

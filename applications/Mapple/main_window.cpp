@@ -49,6 +49,7 @@
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/clipping_plane.h>
 #include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/renderer/drawable_triangles.h>
 #include <easy3d/fileio/point_cloud_io.h>
 #include <easy3d/fileio/graph_io.h>
@@ -512,6 +513,12 @@ Model* MainWindow::open(const std::string& file_name) {
         viewer_->addModel(model);
         viewer_->fitScreen(model);
         ui->treeWidgetModels->addModel(model, true);
+
+        const auto animation_file = file_system::replace_extension(model->name(), "path");
+        if (file_system::is_file(animation_file)) {
+            if (viewer_->walkThrough()->interpolator()->read_keyframes(animation_file))
+                LOG(INFO) << "model has an accompanying animation file (also loaded)";
+        }
     }
 
     return model;
@@ -670,42 +677,6 @@ void MainWindow::restoreCameraStateFromFile() {
 
     if (!fileName.isEmpty())
         viewer_->restoreStateFromFile(fileName.toStdString());
-}
-
-
-void MainWindow::exportCamaraPathToFile() {
-    QString suggested_name = curDataDirectory_;
-    if (viewer()->currentModel()) {
-        const std::string name = file_system::replace_extension(viewer()->currentModel()->name(), "path");
-        suggested_name = QString::fromStdString(name);
-    }
-    const QString fileName = QFileDialog::getSaveFileName(
-            this,
-            "Export camera path to file",
-            suggested_name,
-            "Camera state (*.path)\n"
-            "All formats (*.*)"
-    );
-
-    if (!fileName.isEmpty()) {
-        viewer_->exportCamaraPathToFile(fileName.toStdString());
-        // assume the user will soon restore the state from this file.
-        curDataDirectory_ = fileName.left(fileName.lastIndexOf("/"));
-    }
-}
-
-
-void MainWindow::importCameraPathFromFile() {
-    const QString fileName = QFileDialog::getOpenFileName(
-            this,
-            "Import camera path from file",
-            curDataDirectory_,
-            "Camera path (*.path)\n"
-            "All formats (*.*)"
-    );
-
-    if (!fileName.isEmpty())
-        viewer_->importCameraPathFromFile(fileName.toStdString());
 }
 
 
@@ -896,17 +867,7 @@ void MainWindow::createActionsForCameraMenu() {
     connect(ui->actionSaveCameraStateToFile, SIGNAL(triggered()), this, SLOT(saveCameraStateToFile()));
     connect(ui->actionRestoreCameraStateFromFile, SIGNAL(triggered()), this, SLOT(restoreCameraStateFromFile()));
 
-    connect(ui->actionShowCameraPath, SIGNAL(toggled(bool)), viewer_, SLOT(showCameraPath(bool)));
-    connect(ui->actionAddKeyFrame, SIGNAL(triggered()), viewer_, SLOT(addKeyFrame()));
-    connect(ui->actionPlayCameraPath, SIGNAL(triggered()), viewer_, SLOT(playCameraPath()));
-
-    connect(ui->actionRecordAnimation, SIGNAL(toggled(bool)), this, SLOT(recordAnimation(bool)));
-    connect(ui->actionWalkThrough, SIGNAL(triggered()), this, SLOT(setupWalkThrough()));
-
-    connect(ui->actionImportCameraPathFromFile, SIGNAL(triggered()), this, SLOT(importCameraPathFromFile()));
-    connect(ui->actionExportCamaraPathToFile, SIGNAL(triggered()), this, SLOT(exportCamaraPathToFile()));
-
-    connect(ui->actionDeleteCameraPath, SIGNAL(triggered()), viewer_, SLOT(deleteCameraPath()));
+    connect(ui->actionAnimation, SIGNAL(triggered()), this, SLOT(animation()));
 }
 
 
@@ -1872,32 +1833,15 @@ void MainWindow::surfaceMeshParameterization() {
 }
 
 
-void MainWindow::setupWalkThrough() {
+void MainWindow::animation() {
     static DialogWalkThrough* dialog = nullptr;
     if (!dialog)
         dialog = new DialogWalkThrough(this);
 
     dialog->walkThrough()->start_walking(viewer_->models());
     dialog->show();
-    if (!ui->actionShowCameraPath->isChecked())
-        ui->actionShowCameraPath->setChecked(true);
 }
 
-
-void MainWindow::recordAnimation(bool b) {
-    if (viewer_->recordAnimation(b)) {
-        for (auto action : ui->menuCamera->actions()) {
-            if (action != ui->actionRecordAnimation)
-                action->setEnabled(!b);
-        }
-    }
-}
-
-
-void MainWindow::stopRecordAnimation() {
-    if (ui->actionRecordAnimation->isChecked())
-        ui->actionRecordAnimation->setChecked(false);
-}
 
 
 void MainWindow::surfaceMeshGeodesic() {

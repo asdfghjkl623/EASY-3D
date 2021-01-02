@@ -56,10 +56,13 @@ namespace easy3d {
       application (which will be interpolated). When the user startInterpolation(), the
       KeyFrameInterpolator regularly updates the frame() position and orientation along the path.
 
+     \note The default duration of any two consecutive keyframes is the same. So for a smoother animation, it is
+     suggested to regularly (as equally as possible) sample the viewpoints.
+     \todo Allow edit the duration for each keyframe?  (not sure due to many keyframes and can be annoying).
+
       Here is a typical utilization example (see also the <a href="../examples/keyFrames.html">keyFrames
       example</a>):
       \code
-
 
       init()
       {
@@ -217,11 +220,6 @@ namespace easy3d {
         /*! @name Interpolation parameters */
         //@{
     public:
-        /*! Returns the current interpolation time (in seconds) along the KeyFrameInterpolator path.
-
-        This time is regularly updated when interpolationIsStarted(). Can be set directly with
-        setInterpolationTime() or interpolateAtTime(). */
-        float interpolationTime() const { return interpolationTime_; }
         /*! Returns the current interpolation speed.
 
         Default value is 1.0, which means keyFrameTime() will be matched during the interpolation
@@ -239,30 +237,12 @@ namespace easy3d {
         update, and the frame() state is modified accordingly (see interpolateAtTime()). Default value
         is 40 milliseconds. */
         int interpolationPeriod() const { return period_; }
-        /*! Returns \c true when the interpolation is played in an infinite loop.
-
-        When \c false (default), the interpolation stops when interpolationTime() reaches firstTime()
-        (with negative interpolationSpeed()) or lastTime().
-
-        interpolationTime() is otherwise reset to firstTime() (+ interpolationTime() - lastTime()) (and
-        inversely for negative interpolationSpeed()) and interpolation continues.
-
-        In both cases, the endReached() signal is emitted. */
-        bool loopInterpolation() const { return loopInterpolation_; }
 
     public:
-        /*! Sets the interpolationTime().
-
-        \attention The frame() state is not affected by this method. Use this function to define the
-        starting time of a future interpolation (see startInterpolation()). Use interpolateAtTime() to
-        actually interpolate at a given time. */
-        void setInterpolationTime(float time) { interpolationTime_ = time; }
         /*! Sets the interpolationSpeed(). Negative or null values are allowed. */
         void setInterpolationSpeed(float speed) { interpolationSpeed_ = speed; }
         /*! Sets the interpolationPeriod(). */
         void setInterpolationPeriod(int period) { period_ = period; }
-        /*! Sets the loopInterpolation() value. */
-        void setLoopInterpolation(bool loop=true) { loopInterpolation_ = loop; }
         //@}
 
         /*! @name Interpolation */
@@ -292,29 +272,16 @@ namespace easy3d {
          * \sa startInterpolation(), interpolationIsStarted(), and toggleInterpolation(). */
         void stopInterpolation();
 
-        /*! Stops the interpolation and resets interpolationTime() to the firstTime().
-         * If desired, call interpolateAtTime() after this method to actually move the frame() to firstTime(). */
-        void resetInterpolation();
-
         /*! Calls startInterpolation() or stopInterpolation(), depending on interpolationIsStarted(). */
         void toggleInterpolation() { if (interpolationIsStarted()) stopInterpolation(); else startInterpolation(); }
 
-        /*! Interpolate frame() at time \p time (expressed in seconds). interpolationTime() is set
-         * to \p time and frame() is set accordingly.
-         *
-         * If you simply want to change interpolationTime() but not the frame() state, use setInterpolationTime()
-         * instead.  */
-        virtual void interpolateAtTime(float time);
-        //@}
-
-        /*! @name Computes the interpolation */
-        //@{
-    public:
-        /// Computes and returns the interpolated frame at time \p time (expressed in seconds).
-        Frame compute_at_time(float time) const;
+        /*! Interpolates frame() at time \p time (expressed in seconds).
+         *  This method computes and returns the interpolated frame at time \p time (expressed in seconds).
+         */
+        Frame interpolate(float time) const;
 
         /// Computes and returns all the interpolated frames.
-        std::vector<Frame> compute_all() const;
+        const std::vector<Frame>& interpolate();
         //@}
 
         /*! @name Path drawing */
@@ -328,22 +295,16 @@ namespace easy3d {
          * The rendering state can be changes by calling the path/cameras drawable's related methods. */
         virtual void draw_path(const Camera* camera, float camera_width);
 
-        /// Adjusts the scene radius so that the entire camera path is within the view frustum.
-        /// \related The adjusted scene radius.
-        float adjust_scene_radius(Camera* cam) const;
         //@}
 
         /*! @name File io */
         //@{
     public:
         /// saves the camera path to a file
-        void save_path(const std::string& file_name) const;
+        bool save_keyframes(const std::string& file_name) const;
         /// reads camera path from a file
-        void read_path(const std::string& file_name);
+        bool read_keyframes(const std::string& file_name);
         //@}
-
-    private:
-        virtual void update();
 
     private:
         // Copy constructor and operator= are declared private and undefined
@@ -351,7 +312,7 @@ namespace easy3d {
         KeyFrameInterpolator(const KeyFrameInterpolator& kfi);
         KeyFrameInterpolator& operator=(const KeyFrameInterpolator& kfi);
 
-    #ifndef DOXYGEN
+#ifndef DOXYGEN
         // Internal private KeyFrame representation
         class KeyFrame
         {
@@ -376,6 +337,8 @@ namespace easy3d {
         void computeSpline(const std::vector<KeyFrame*>::const_iterator* relatedFrames, vec3& v1, vec3& v2) const;
 #endif
 
+    private:
+
         // Key Frames
         std::vector<KeyFrame*> keyFrames_;
         std::vector<Frame> interpolated_path_;
@@ -386,12 +349,9 @@ namespace easy3d {
         // Rhythm
         Timer timer_;
         int period_;
-        float interpolationTime_;
         float interpolationSpeed_;
         bool interpolationStarted_;
-
-        // Make a loop?
-        bool loopInterpolation_;
+        int start_position_;
 
         // is path valid? Adding new keyframes, editing an a keyframe invalidates the path
         bool pathIsValid_;
@@ -400,7 +360,7 @@ namespace easy3d {
         LinesDrawable* cameras_drawable_;
 
     public:
-        Signal end_reached;
+        Signal interpolation_stopped;
     };
 
 }

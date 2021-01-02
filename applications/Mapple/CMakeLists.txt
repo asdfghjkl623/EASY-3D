@@ -4,7 +4,6 @@ get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 project(${PROJECT_NAME})
 
 
-add_subdirectory(tools)
 
 include(../../cmake/UseQt5.cmake)
 if (NOT QT5_FOUND)
@@ -14,6 +13,24 @@ if (NOT QT5_FOUND)
             "containing the 'bin' folder.")
     return()
 endif ()
+
+
+find_package(FFMPEG QUIET)
+if (NOT FFMPEG_FOUND)
+    message(WARNING "${PROJECT_NAME} requires FFMPEG to generate video files for animations but FFMPEG was not found. "
+            "Without FFMPEG, animations can only be recorded as a sequence of images. "
+            "To use FFMPEG, first set 'FFMPEG_DIR' to 'cmake/ffmpeg-config.cmake'. Then modify the 'ffmpeg_path' "
+            "variable in 'cmake/ffmpeg-config.cmake' to point to the folder in which FFMPEG was installed."
+            )
+else ()
+    add_subdirectory(video)
+    add_definitions(-DHAS_FFMPEG)
+    message(STATUS "   FFMPEG_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS}")
+    message(STATUS "   FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES}")
+endif ()
+
+
+add_subdirectory(tools)
 
 
 # some algorithms may use OpenMP
@@ -143,6 +160,10 @@ endif ()
 
 target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
 target_link_libraries(${PROJECT_NAME} renderer algo tools)
+
+if (FFMPEG_FOUND)
+    target_link_libraries(${PROJECT_NAME} video)
+endif ()
 
 if (EASY3D_HAS_CGAL)
     target_link_libraries(${PROJECT_NAME} algo_ext)

@@ -28,8 +28,11 @@
 #include "dialog.h"
 #include "ui_dialog_walk_through.h"
 
+
 namespace easy3d {
     class WalkThrough;
+    class KeyFrameInterpolator;
+    class ProgressLogger;
 }
 
 
@@ -41,18 +44,27 @@ public:
     explicit DialogWalkThrough(MainWindow *window);
 	~DialogWalkThrough();
 
+    easy3d::KeyFrameInterpolator* interpolator();
     easy3d::WalkThrough* walkThrough();
 
 public Q_SLOTS :
+    void importCameraPathFromFile();
+    void exportCameraPathToFile();
+    void showCameraPath(bool);
+    void clearPath();
+
+    void addKeyFrame();
+
+    void setWalkingMode(bool);
+
+    void goToPosition(int);
     void goToPreviousPosition();
     void goToNextPosition();
     void removeLastPosition();
 
-    void goToPosition(int);
-
-	void startAnimation(bool);
-	void exportAnimation();
-    void clearPath();
+    void browse();
+	void preview(bool);
+    void record(bool);
 
 	void setCharacterHeightFactor(double);
 	void setCharacterDistanceFactor(double);
@@ -61,13 +73,17 @@ public Q_SLOTS :
 	void resetUIAfterAnimationStopped();
 
 signals:
-    void animationFinished();
+    void animationStopped();
 
 protected:
 	virtual	void showEvent(QShowEvent* e);
 	virtual void closeEvent(QCloseEvent* e);
 
-	void newPositionAdded();
+	void enableAllButtons(bool);
+    void newPositionAdded();
+
+private:
+    easy3d::ProgressLogger* progress_;
 };
 
 #endif // DIALOG_WALK_THROUGH_H

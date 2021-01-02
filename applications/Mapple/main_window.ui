@@ -199,18 +199,7 @@
     <addaction name="actionSaveCameraStateToFile"/>
     <addaction name="actionRestoreCameraStateFromFile"/>
     <addaction name="separator"/>
-    <addaction name="actionAddKeyFrame"/>
-    <addaction name="actionWalkThrough"/>
-    <addaction name="separator"/>
-    <addaction name="actionShowCameraPath"/>
-    <addaction name="separator"/>
-    <addaction name="actionPlayCameraPath"/>
-    <addaction name="actionRecordAnimation"/>
-    <addaction name="separator"/>
-    <addaction name="actionExportCamaraPathToFile"/>
-    <addaction name="actionImportCameraPathFromFile"/>
-    <addaction name="separator"/>
-    <addaction name="actionDeleteCameraPath"/>
+    <addaction name="actionAnimation"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
@@ -700,11 +689,6 @@
     <string>Sampling (to a point cloud)</string>
    </property>
   </action>
-  <action name="actionDetectDuplicateAndFoldingFaces">
-   <property name="text">
-    <string>Detect duplicate/folding faces</string>
-   </property>
-  </action>
   <action name="actionRemoveDuplicateAndFoldingFaces">
    <property name="text">
     <string>Remove degenerate/duplicate/folding faces</string>
@@ -1027,51 +1011,6 @@
     <string>Tetrahedralization</string>
    </property>
   </action>
-  <action name="actionAddKeyFrame">
-   <property name="text">
-    <string>Add key frame to camera path</string>
-   </property>
-   <property name="shortcut">
-    <string>Alt+K</string>
-   </property>
-  </action>
-  <action name="actionPlayCameraPath">
-   <property name="text">
-    <string>Play camera path</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+K</string>
-   </property>
-  </action>
-  <action name="actionDeleteCameraPath">
-   <property name="text">
-    <string>Delete camera path</string>
-   </property>
-   <property name="shortcut">
-    <string>Alt+D</string>
-   </property>
-  </action>
-  <action name="actionShowCameraPath">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show/Hide camera path</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+T</string>
-   </property>
-  </action>
-  <action name="actionExportCamaraPathToFile">
-   <property name="text">
-    <string>Export camara path to file</string>
-   </property>
-  </action>
-  <action name="actionImportCameraPathFromFile">
-   <property name="text">
-    <string>Import camera path from file</string>
-   </property>
-  </action>
   <action name="actionShowFaceVertexLabelsUnderMouse">
    <property name="checkable">
     <bool>true</bool>
@@ -1094,28 +1033,16 @@
     <string>Show the XYZ cordinates under mouse</string>
    </property>
   </action>
-  <action name="actionWalkThrough">
-   <property name="icon">
-    <iconset resource="mapple.qrc">
-     <normaloff>:/resources/icons/walkthrough.png</normaloff>:/resources/icons/walkthrough.png</iconset>
-   </property>
-   <property name="text">
-    <string>Walk Through</string>
-   </property>
-  </action>
-  <action name="actionRecordAnimation">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
+  <action name="actionAnimation">
    <property name="icon">
     <iconset resource="mapple.qrc">
      <normaloff>:/resources/icons/record.png</normaloff>:/resources/icons/record.png</iconset>
    </property>
    <property name="text">
-    <string>Record animation</string>
+    <string>Animation</string>
    </property>
-   <property name="statusTip">
-    <string>Record the animation as a sequence of images into a specified folder</string>
+   <property name="toolTip">
+    <string>Animation from a set of viewpoints  </string>
    </property>
   </action>
   <action name="actionShowEasy3DLogo">
