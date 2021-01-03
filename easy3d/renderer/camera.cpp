@@ -92,7 +92,7 @@ namespace easy3d {
 
 	/*! Virtual destructor.
 
-	 The frame() is deleted, but the different keyFrameInterpolator() are \e not
+	 The frame() is deleted, but the different keyframe_interpolator() are \e not
 	 deleted (in case they are shared). */
 	Camera::~Camera() {
 		delete frame_;
@@ -144,7 +144,7 @@ namespace easy3d {
 		frame_->setPosition(camera.position());
 		frame_->setOrientation(camera.orientation());
 
-        interpolationKfi_->stopInterpolation();
+        interpolationKfi_->stop_interpolation();
 
 		computeProjectionMatrix();
 		computeModelViewMatrix();
@@ -296,7 +296,7 @@ namespace easy3d {
 			return;
 
 		frame_ = mcf;
-        interpolationKfi_->setFrame(frame());
+        interpolationKfi_->set_frame(frame());
 
         easy3d::connect(&frame_->modified,  this,  &Camera::modified);
         // frame_->modified.connect(this, &Camera::modified); // this should also work
@@ -525,7 +525,7 @@ namespace easy3d {
 	\attention This methods also sets focusDistance() to sceneRadius() /
 	tan(fieldOfView()/2) and flySpeed() to 1% of sceneRadius(). */
 	void Camera::setSceneRadius(float radius) {
-		if (radius <= 0.0f) {
+		if (radius <= epsilon<float>()) {
 			LOG(ERROR) << "Scene radius must be positive (value is: " << radius << ")";
 			return;
 		}
@@ -586,9 +586,9 @@ namespace easy3d {
 		switch (type()) {
 		case Camera::PERSPECTIVE:
 			return 2.0f * std::fabs((frame()->coordinatesOf(position)).z) *
-				tan(fieldOfView() / 2.0f) / screenHeight();
+				std::tan(fieldOfView() / 2.0f) / screenHeight();
 		case Camera::ORTHOGRAPHIC: {
-			float w, h;
+			float w(0), h(0);
 			getOrthoWidthHeight(w, h);
 			return 2.0f * h / screenHeight();
 		}
@@ -686,20 +686,13 @@ namespace easy3d {
 
       See also interpolateToFitScene() and interpolateToZoomOnPixel(). */
     void Camera::interpolateTo(const Frame &fr, double duration) {
-        if (interpolationKfi_->interpolationIsStarted())
-            interpolationKfi_->stopInterpolation();
+        if (interpolationKfi_->is_interpolation_started())
+            interpolationKfi_->stop_interpolation();
 
-        interpolationKfi_->deletePath();
-        interpolationKfi_->addKeyFrame(*frame());
-
-#if 0
-        // add an intermediate frame to make the transition smoother (starts faster but ends slower)
-        interpolationKfi_->addKeyFrame(Frame(0.3 * frame()->position() + 0.7 * fr.position(), frame()->orientation()), 0.4);
-#endif
-
-        interpolationKfi_->addKeyFrame(fr, duration);
-
-        interpolationKfi_->startInterpolation();
+        interpolationKfi_->delete_path();
+        interpolationKfi_->add_keyframe(*frame());
+        interpolationKfi_->add_keyframe(fr, duration);
+        interpolationKfi_->start_interpolation();
     }
 
 

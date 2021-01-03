@@ -46,15 +46,18 @@ DialogWalkThrough::DialogWalkThrough(MainWindow *window)
 {
 	setupUi(this);
 
+	spinBoxFPS->setValue(interpolator()->frame_rate());
+	doubleSpinBoxInterpolationSpeed->setValue(interpolator()->interpolation_speed());
+
 	connect(doubleSpinBoxCharacterHeightFactor, SIGNAL(valueChanged(double)), this, SLOT(setCharacterHeightFactor(double)));
 	connect(doubleSpinBoxCharacterDistanceFactor, SIGNAL(valueChanged(double)), this, SLOT(setCharacterDistanceFactor(double)));
-    connect(doubleSpinBoxInterpolationSpeed, SIGNAL(valueChanged(double)), this, SLOT(setInterpolationSpeed(double)));
+
+    connect(spinBoxFPS, SIGNAL(valueChanged(int)), this, SLOT(setFrameRate(int)));
+    connect(doubleSpinBoxInterpolationSpeed, SIGNAL(valueChanged(double)), this, SLOT(set_interpolation_speed(double)));
 
     connect(importCameraPathButton, SIGNAL(clicked()), this, SLOT(importCameraPathFromFile()));
     connect(exportCameraPathButton, SIGNAL(clicked()), this, SLOT(exportCameraPathToFile()));
     connect(checkBoxShowCameraPath, SIGNAL(toggled(bool)), this, SLOT(showCameraPath(bool)));
-
-    connect(addKeyframeButton, SIGNAL(clicked()), this, SLOT(addKeyFrame()));
 
     connect(radioButtonWalkingMode, SIGNAL(toggled(bool)), this, SLOT(setWalkingMode(bool)));
 
@@ -70,7 +73,7 @@ DialogWalkThrough::DialogWalkThrough(MainWindow *window)
 
     connect(browseButton, SIGNAL(clicked()), this, SLOT(browse()));
 
-    easy3d::connect(&walkThrough()->path_modified, this, &DialogWalkThrough::newPositionAdded);
+    easy3d::connect(&walkThrough()->path_modified, this, &DialogWalkThrough::keyFrameAdded);
 
     QButtonGroup* group = new QButtonGroup(this);
     group->addButton(radioButtonFreeMode);
@@ -84,16 +87,16 @@ DialogWalkThrough::~DialogWalkThrough()
 }
 
 
-void DialogWalkThrough::newPositionAdded() {
+void DialogWalkThrough::keyFrameAdded() {
     disconnect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToPosition(int)));
-    int num = walkThrough()->num_positions();
+    int num = interpolator()->number_of_keyframes();
     if (num == 1) // range is [0, 0]
         horizontalSliderPreview->setEnabled(false);
     else {
         horizontalSliderPreview->setEnabled(true);
         horizontalSliderPreview->setRange(0, std::max(0, num - 1));
     }
-    int pos = walkThrough()->current_position();
+    int pos = walkThrough()->current_keyframe_index();
     horizontalSliderPreview->setValue(pos);
     connect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToPosition(int)));
 }
@@ -110,6 +113,11 @@ easy3d::KeyFrameInterpolator* DialogWalkThrough::interpolator() {
 
 
 void DialogWalkThrough::showEvent(QShowEvent* e) {
+    if (radioButtonWalkingMode->isChecked())
+        walkThrough()->set_status(easy3d::WalkThrough::WALKING_MODE);
+    else
+        walkThrough()->set_status(easy3d::WalkThrough::FREE_MODE);
+
 	doubleSpinBoxCharacterHeightFactor->setValue(walkThrough()->height_factor());
 	doubleSpinBoxCharacterDistanceFactor->setValue(walkThrough()->third_person_forward_factor());
 
@@ -129,78 +137,82 @@ void DialogWalkThrough::showEvent(QShowEvent* e) {
 
 
 void DialogWalkThrough::closeEvent(QCloseEvent* e) {
+    walkThrough()->set_status(easy3d::WalkThrough::STOPPED);
     QDialog::closeEvent(e);
 	viewer_->update();
 }
 
 
-void DialogWalkThrough::addKeyFrame() {
-    easy3d::Frame *frame = viewer_->camera()->frame();
-    walkThrough()->add_key_frame(*frame);
-    viewer_->update();
-}
-
 void DialogWalkThrough::setCharacterHeightFactor(double h) {
     walkThrough()->set_height_factor(h);
+    DLOG(WARNING) << "TODO: allow to modify the last keyframe (camera position and orientation) here" << std::endl;
     viewer_->update();
 }
 
 
 void DialogWalkThrough::setCharacterDistanceFactor(double d) {
     walkThrough()->set_third_person_forward_factor(d);
+    DLOG(WARNING) << "TODO: allow to modify the last keyframe (camera position and orientation) here" << std::endl;
     viewer_->update();
 }
 
 
-void DialogWalkThrough::setInterpolationSpeed(double s) {
-    interpolator()->setInterpolationSpeed(s);
+void DialogWalkThrough::set_interpolation_speed(double s) {
+    interpolator()->set_interpolation_speed(s);
+    viewer_->update();
+}
+
+
+void DialogWalkThrough::setFrameRate(int fps) {
+    interpolator()->set_frame_rate(fps);
     viewer_->update();
 }
 
 
 void DialogWalkThrough::setWalkingMode(bool b) {
-    addKeyframeButton->setEnabled(!b);
-
     labelCharacterHeight->setEnabled(b);
     labelCharacterDistanceToEye->setEnabled(b);
     doubleSpinBoxCharacterHeightFactor->setEnabled(b);
     doubleSpinBoxCharacterDistanceFactor->setEnabled(b);
+
+    if (b)
+        walkThrough()->set_status(easy3d::WalkThrough::WALKING_MODE);
+    else
+        walkThrough()->set_status(easy3d::WalkThrough::FREE_MODE);
 }
 
 
 void DialogWalkThrough::goToPreviousPosition()
 {
-    int pos = walkThrough()->current_position();
-    int new_pos = walkThrough()->move_to(pos - 1);
-    viewer_->update();
-
-    if (new_pos == pos)
-        LOG(INFO) << "no previous position found (current position is " << new_pos << ")";
+    int pos = walkThrough()->current_keyframe_index();
+    if (pos <= 0)  // if not started (or at the 1st keyframe), move to the start view point
+        walkThrough()->move_to(0);
     else
-        LOG(INFO) << "moved to position " << new_pos;
+        walkThrough()->move_to(pos - 1);
+    viewer_->update();
+    LOG(INFO) << "moved to position " << walkThrough()->current_keyframe_index();
 }
 
 
 void DialogWalkThrough::goToNextPosition()
 {
-    int pos = walkThrough()->current_position();
-    int new_pos = walkThrough()->move_to(pos + 1);
-    viewer_->update();
-
-    if (new_pos == pos)
-        LOG(INFO) << "no next position found (current position is " << new_pos << ")";
+    int pos = walkThrough()->current_keyframe_index();
+    if (pos >= interpolator()->number_of_keyframes() - 1)  // if already at the end, move to the last view point
+        walkThrough()->move_to(interpolator()->number_of_keyframes() - 1);
     else
-        LOG(INFO) << "moved to position " << new_pos;
+        walkThrough()->move_to(pos + 1);
+    viewer_->update();
+    LOG(INFO) << "moved to position " << walkThrough()->current_keyframe_index();
 }
 
 
 void DialogWalkThrough::removeLastPosition() {
-    if (walkThrough()->num_positions() == 0) {
+    if (interpolator()->number_of_keyframes() == 0) {
         LOG(INFO) << "no position can be removed (path is empty)";
     }
     else {
-        int pos = walkThrough()->current_position();
-        if (pos == walkThrough()->num_positions() - 1)  // currently viewing at the last position
+        int pos = walkThrough()->current_keyframe_index();
+        if (pos == interpolator()->number_of_keyframes() - 1)  // currently viewing at the last position
             pos = walkThrough()->move_to(pos - 1);  // move to the previous position
         walkThrough()->delete_last_position();
         viewer_->update();
@@ -217,7 +229,7 @@ void DialogWalkThrough::goToPosition(int p) {
 
 
 void DialogWalkThrough::clearPath() {
-    if (walkThrough()->num_positions() == 0 && interpolator()->numberOfKeyFrames() == 0) {
+    if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
         LOG(WARNING) << "nothing to clear (path is empty)";
         return;
     }
@@ -234,104 +246,142 @@ void DialogWalkThrough::clearPath() {
 }
 
 
-void DialogWalkThrough::enableAllButtons(bool b) {
-    labelCharacterHeight->setEnabled(b);
-    labelCharacterDistanceToEye->setEnabled(b);
-    doubleSpinBoxCharacterHeightFactor->setEnabled(b);
-    doubleSpinBoxCharacterDistanceFactor->setEnabled(b);
-    previousPositionButton->setEnabled(b);
-    nextPositionButton->setEnabled(b);
-    removeLastPositionButton->setEnabled(b);
-    horizontalSliderPreview->setEnabled(b);
-    previewButton->setEnabled(b);
-    recordButton->setEnabled(b);
-    clearCameraPathButton->setEnabled(b);
-    update();
-    QApplication::processEvents();
-}
-
-
 void DialogWalkThrough::browse() {
-    std::string dir;
+    std::string suggested_name;
     if (viewer_->currentModel())
-        dir = file_system::parent_directory(viewer_->currentModel()->name());
+        suggested_name = file_system::replace_extension(viewer_->currentModel()->name(), "mp4");
     const QString fileName = QFileDialog::getSaveFileName(this,
-                                                    tr("Choose a file name"), QString::fromStdString(dir),
-                                                    tr("Supported formats (*.png *.mp4)")
+                                                          tr("Choose a file name"), QString::fromStdString(suggested_name),
+                                                          tr("Supported formats (*.png *.mp4)")
     );
-    lineEditOutputFile->setText(fileName);
+    if (!fileName.isEmpty())
+        lineEditOutputFile->setText(fileName);
 }
 
 
 void DialogWalkThrough::preview(bool b) {
-    if (walkThrough()->num_positions() == 0 && interpolator()->numberOfKeyFrames() == 0) {
-        previewButton->setChecked(false);
-        return;
-    }
-
-    auto interpolationStopped = [this]() -> void { emit animationStopped(); };
-
-    if (b) {
-        enableAllButtons(false);
-        previewButton->setEnabled(true);
-
-        easy3d::connect(&interpolator()->interpolation_stopped, 0, interpolationStopped);
-        QObject::connect(this, &DialogWalkThrough::animationStopped, this, &DialogWalkThrough::resetUIAfterAnimationStopped);
-
-        walkThrough()->animate();
-        LOG(INFO) << "animation started...";
-    }
-    else {
-        enableAllButtons(true);
-
-        easy3d::disconnect(&interpolator()->interpolation_stopped, 0);
-        QObject::disconnect(this, &DialogWalkThrough::animationStopped, this, &DialogWalkThrough::resetUIAfterAnimationStopped);
-
-        interpolator()->stopInterpolation();
-        LOG(INFO) << "animation finished";
-    }
-
+#if 1
+    // this single line works: very efficient (in another thread without overhead).
+    walkThrough()->preview();
     viewer_->update();
+
+#elif 0 // this also works. But std::this_thread::sleep_for() is not efficient and frame rate is low.
+    if (b) {
+        if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
+            recordButton->setChecked(false);
+            return;
+        }
+        static int last_stopped_index = 0;
+        const auto &frames = interpolator()->interpolate();
+
+        setEnabled(false);
+        LOG(INFO) << "preview started...";
+
+        ProgressLogger progress(frames.size(), true);
+        for (int id = last_stopped_index; id < frames.size(); ++id) {
+            if (progress.is_canceled()) {
+                last_stopped_index = id;
+                LOG(INFO) << "preview cancelled";
+                break;
+            }
+            const auto &f = frames[id];
+            viewer_->camera()->frame()->setPositionAndOrientation(f.position(), f.orientation());
+            const int interval = interpolator()->interpolation_period() / interpolator()->interpolation_speed();
+            std::cout << "interval: " << interval << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(interval));
+            if (id == frames.size() - 1)  // reaches the end frame
+                last_stopped_index = 0;
+
+            progress.next();
+        }
+
+        if (last_stopped_index == 0)
+            LOG(INFO) << "preview finished";
+
+        setEnabled(true);
+        previewButton->setChecked(false);
+    }
+    else
+        recordButton->setChecked(false);
+
+#else
+
+    // this also handles the UI, but too complicated. I don't like it.
+//    auto interpolationStopped = [this]() -> void { emit animationStopped(); };
+//    auto currentFrameFinished = [this]() -> void { emit oneFrameFinished(); };
+//
+//    if (b) {
+//        if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
+//            previewButton->setChecked(false);
+//            return;
+//        }
+//
+//        easy3d::connect(&interpolator()->interpolation_stopped, 0, interpolationStopped);
+//        easy3d::connect(&interpolator()->current_frame_finished, 0, currentFrameFinished);
+//        QObject::connect(this, &DialogWalkThrough::animationStopped, this, &DialogWalkThrough::resetUIAfterAnimationStopped);
+//        QObject::connect(this, &DialogWalkThrough::oneFrameFinished, this, &DialogWalkThrough::onOneFrameFinished);
+//
+//        setEnabled(false);
+//
+//        LOG(INFO) << "preview started...";
+//    }
+//    else {
+//        easy3d::disconnect(&interpolator()->interpolation_stopped, 0);
+//        easy3d::disconnect(&interpolator()->current_frame_finished, 0);
+//        QObject::disconnect(this, &DialogWalkThrough::animationStopped, this, &DialogWalkThrough::resetUIAfterAnimationStopped);
+//        QObject::disconnect(this, &DialogWalkThrough::oneFrameFinished, this, &DialogWalkThrough::onOneFrameFinished);
+//
+//        interpolator()->stop_interpolation();
+//        LOG(INFO) << "animation finished";
+//
+//        setEnabled(true);
+//        previewButton->setChecked(false);
+//    }
+#endif
 }
 
 
 void DialogWalkThrough::record(bool b) {
     if (b) {
-        if (walkThrough()->num_positions() == 0 && interpolator()->numberOfKeyFrames() == 0) {
+        if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
             recordButton->setChecked(false);
             return;
         }
+
+        if (previewButton->isChecked())
+            previewButton->setChecked(false);
+
+        // make sure the path is not visible in recording
+        const bool visible = walkThrough()->is_path_visible();
+        if (visible)
+            walkThrough()->set_path_visible(false);
 
         const QString file = lineEditOutputFile->text();
         const int fps = spinBoxFPS->value();
         const int bitrate = spinBoxBitRate->value();
 
-        enableAllButtons(false);
-        recordButton->setEnabled(true);
+        setEnabled(false);
         viewer_->recordAnimation(file, fps, bitrate, true);
-        enableAllButtons(true);
+        setEnabled(true);
         recordButton->setChecked(false);
+
+        // restore
+        if (visible)
+            walkThrough()->set_path_visible(true);
     }
     else
         recordButton->setChecked(false);
 }
 
 
-void DialogWalkThrough::resetUIAfterAnimationStopped() {
-    previewButton->setChecked(false);
-    recordButton->setChecked(false);
-    enableAllButtons(true);
-}
-
-
 void DialogWalkThrough::showCameraPath(bool b) {
     walkThrough()->set_path_visible(b);
     if (b) {
-        const int count = interpolator()->numberOfKeyFrames();
+        const int count = interpolator()->number_of_keyframes();
         float radius = viewer_->camera()->sceneRadius();
         for (int i=0; i<count; ++i) {
             radius = std::max( radius,
-                               distance(viewer_->camera()->sceneCenter(), interpolator()->keyFrame(i).position())
+                               distance(viewer_->camera()->sceneCenter(), interpolator()->keyframe(i).position())
             );
         }
         viewer_->camera()->setSceneRadius(radius);
@@ -347,26 +397,28 @@ void DialogWalkThrough::showCameraPath(bool b) {
 
 
 void DialogWalkThrough::exportCameraPathToFile() {
-    if (walkThrough()->num_positions() == 0 && interpolator()->numberOfKeyFrames() == 0) {
+    if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
         LOG(INFO) << "nothing can be exported (path is empty)";
         return;
     }
 
-    std::string name = "./animation.path";
+    std::string name = "./keyframes.kf";
     if (viewer_->currentModel())
-        name = file_system::replace_extension(viewer_->currentModel()->name(), "path");
+        name = file_system::replace_extension(viewer_->currentModel()->name(), "kf");
 
     QString suggested_name = QString::fromStdString(name);
     const QString fileName = QFileDialog::getSaveFileName(
             this,
-            "Export camera path to file",
+            "Export keyframes to file",
             suggested_name,
-            "Camera state (*.path)\n"
+            "Keyframe file (*.kf)\n"
             "All formats (*.*)"
     );
 
-    if (!fileName.isEmpty())
-        interpolator()->save_keyframes(fileName.toStdString());
+    if (!fileName.isEmpty()) {
+        if (interpolator()->save_keyframes(fileName.toStdString()))
+            LOG(INFO) << "keyframes saved to file";
+    }
 }
 
 
@@ -377,27 +429,31 @@ void DialogWalkThrough::importCameraPathFromFile() {
     QString suggested_dir = QString::fromStdString(dir);
     const QString fileName = QFileDialog::getOpenFileName(
             this,
-            "Import camera path from file",
+            "Import keyframes from file",
             suggested_dir,
-            "Camera path (*.path)\n"
+            "Keyframe file (*.kf)\n"
             "All formats (*.*)"
     );
 
     if (fileName.isEmpty())
         return;
 
-    interpolator()->read_keyframes(fileName.toStdString());
-    if (walkThrough()->is_path_visible()) {
-        // update scene radius to make sure the path is within the view frustum
-        int num = interpolator()->numberOfKeyFrames();
-        float radius = viewer_->camera()->sceneRadius();
-        for (int i = 0; i < num; ++i) {
-            radius = std::max(
-                    radius,
-                    distance(viewer_->camera()->sceneCenter(), interpolator()->keyFrame(i).position())
-            );
+    if (interpolator()->read_keyframes(fileName.toStdString())) {
+        LOG(INFO) << interpolator()->number_of_keyframes() << " keyframes loaded";
+        if (walkThrough()->is_path_visible()) {
+            // update scene radius to make sure the path is within the view frustum
+            int num = interpolator()->number_of_keyframes();
+            float radius = viewer_->camera()->sceneRadius();
+            for (int i = 0; i < num; ++i) {
+                radius = std::max(
+                        radius,
+                        distance(viewer_->camera()->sceneCenter(), interpolator()->keyframe(i).position())
+                );
+            }
+            viewer_->camera()->setSceneRadius(radius);
+            viewer_->update();
         }
-        viewer_->camera()->setSceneRadius(radius);
     }
+
     update();
 }

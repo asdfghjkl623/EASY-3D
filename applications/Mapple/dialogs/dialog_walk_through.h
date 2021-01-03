@@ -52,8 +52,6 @@ public Q_SLOTS :
     void showCameraPath(bool);
     void clearPath();
 
-    void addKeyFrame();
-
     void setWalkingMode(bool);
 
     void goToPosition(int);
@@ -67,19 +65,14 @@ public Q_SLOTS :
 
 	void setCharacterHeightFactor(double);
 	void setCharacterDistanceFactor(double);
-	void setInterpolationSpeed(double);
-
-	void resetUIAfterAnimationStopped();
-
-signals:
-    void animationStopped();
+	void set_interpolation_speed(double);
+	void setFrameRate(int);
 
 protected:
 	virtual	void showEvent(QShowEvent* e);
 	virtual void closeEvent(QCloseEvent* e);
 
-	void enableAllButtons(bool);
-    void newPositionAdded();
+    void keyFrameAdded();
 };
 
 #endif // DIALOG_WALK_THROUGH_H

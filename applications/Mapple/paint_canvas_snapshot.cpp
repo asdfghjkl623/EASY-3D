@@ -107,7 +107,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
     if (nbX * sub_w < w) ++nbX;
     if (nbY * sub_h < h) ++nbY;
 
-    ProgressLogger progress(nbX * nbY * 1.1f); // the extra 0.1 is for saving the "big" image (time consuming)
+    ProgressLogger progress(nbX * nbY * 1.1f, false, false); // the extra 0.1 is for saving the "big" image (time consuming)
 
     // remember the current projection matrix
     // const mat4& proj_matrix = camera()->projectionMatrix(); // Liangliang: This will definitely NOT work !!!
@@ -192,7 +192,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
             ++count;
 
 #ifdef SHOW_PROGRESS
-            progress.next(false);
+            progress.next();
             // this very important (the progress bar may interfere the framebuffer
             makeCurrent();
 #endif
@@ -212,14 +212,13 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
 }
 
 
-//#ifdef HAS_FFMPEG
-#if 0
+#ifdef HAS_FFMPEG
 
 #include "video/QVideoEncoder.h"
 
 void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rate, bool bk_white) {
     auto kfi = walkThrough()->interpolator();
-    if (kfi->numberOfKeyFrames() == 0) {
+    if (kfi->number_of_keyframes() == 0) {
         LOG(WARNING) << "recording aborted (camera path is empty). You may import a camera path from a file or"
                         " creat it by adding key frames";
         return;
@@ -273,7 +272,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
 #endif
 
     const QString ext_less_name = file_name.left(file_name.lastIndexOf('.'));
-    ProgressLogger progress(frames.size());
+    ProgressLogger progress(frames.size(), false, false);
     for (std::size_t frame_index = 0; frame_index < frames.size(); ++frame_index) {
         if (progress.is_canceled()) {
             success = false;
@@ -323,11 +322,14 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
         currentTime += timeStep;
 
 #ifdef SHOW_PROGRESS
-        progress.next(false);
+        progress.next();
         // this very important (the progress bar may interfere the framebuffer
         makeCurrent();
 #endif
     }
+
+    // this very important (the progress bar may interfere the framebuffer
+    makeCurrent();
 
     // clean
     delete fbo;
@@ -354,7 +356,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
 
 void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_white) {
     auto kfi = walkThrough()->interpolator();
-    if (kfi->numberOfKeyFrames() == 0) {
+    if (kfi->number_of_keyframes() == 0) {
         LOG(WARNING) << "recording aborted (camera path is empty). You may import a camera path from a file or"
                         " creat it by adding key frames";
         return;
@@ -395,7 +397,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_wh
 
     bool success = true;
     const QString ext_less_name = file_name.left(file_name.lastIndexOf('.'));
-    ProgressLogger progress(frames.size());
+    ProgressLogger progress(frames.size(), false, false);
     for (std::size_t frame_index = 0; frame_index < frames.size(); ++frame_index) {
         if (progress.is_canceled()) {
             success = false;
@@ -440,11 +442,13 @@ void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_wh
         }
 
 #ifdef SHOW_PROGRESS
-        progress.next(false);
+        progress.next();
         // this very important (the progress bar may interfere the framebuffer
         makeCurrent();
 #endif
     }
+    // this very important (the progress bar may interfere the framebuffer
+    makeCurrent();
 
     // clean
     delete fbo;

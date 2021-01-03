@@ -300,11 +300,16 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
             }
         }
 
-        if (e->modifiers() == Qt::ControlModifier) {
+        if (e->modifiers() == Qt::AltModifier) {
             bool found = false;
             const vec3 p = pointUnderPixel(e->pos(), found);
-            if (found && !walkThrough()->interpolator()->interpolationIsStarted()) {
+            if (found && (walkThrough()->status() == easy3d::WalkThrough::WALKING_MODE) &&
+                (!walkThrough()->interpolator()->is_interpolation_started()))
+            {
                 walkThrough()->walk_to(p);
+            }
+            else if (walkThrough()->status() == easy3d::WalkThrough::FREE_MODE) {
+                LOG(WARNING) << "Alt + Left click is for the walking mode only. Use Ctrl + C instead";
             }
         }
     }
@@ -381,7 +386,7 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
 
 void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
     int x = e->pos().x(), y = e->pos().y();
-    if (x < 0 || x > width() || y < 0 || y > height() || walkThrough()->interpolator()->interpolationIsStarted()) {
+    if (x < 0 || x > width() || y < 0 || y > height() || walkThrough()->interpolator()->is_interpolation_started()) {
         e->ignore();
         return;
     }
@@ -1091,11 +1096,11 @@ void PaintCanvas::postDraw() {
     }
 
     // shown only when it is not animating
-    if (walk_through_ && walk_through_->is_path_visible() && !walk_through_->interpolator()->interpolationIsStarted())
+    if (walk_through_ && walk_through_->is_path_visible() && !walk_through_->interpolator()->is_interpolation_started())
         walk_through_->draw();
     easy3d_debug_log_gl_error;
 
-    if (show_pivot_point_) {
+    if (show_pivot_point_ || pressed_button_ != Qt::NoButton) {
         ShaderProgram *program = ShaderManager::get_program("lines/lines_plain_color");
         if (!program) {
             std::vector<ShaderProgram::Attribute> attributes;
@@ -1255,9 +1260,12 @@ void PaintCanvas::setPerspective(bool b) {
 
 
 void PaintCanvas::copyCamera() {
-    if (camera()->frame()) {
-        const vec3 pos = camera()->position();
-        const quat q = camera()->orientation();
+    const vec3 pos = camera()->position();
+    const quat q = camera()->orientation();
+    if (walkThrough()->status() == easy3d::WalkThrough::FREE_MODE) {
+        walkThrough()->add_keyframe(Frame(camera()->position(), q));
+    }
+    else if (walkThrough()->status() == easy3d::WalkThrough::STOPPED) {
         const QString cam_str = QString("%1 %2 %3 %4 %5 %6 %7")
                 .arg(pos[0])
                 .arg(pos[1])
@@ -1268,11 +1276,13 @@ void PaintCanvas::copyCamera() {
                 .arg(q[3]);
         qApp->clipboard()->setText(cam_str);
     }
+    else if (walkThrough()->status() == easy3d::WalkThrough::WALKING_MODE)
+        LOG(WARNING) << "Ctrl + C is for the free mode only. Use Alt + Left click instead";
 }
 
 
 void PaintCanvas::pasteCamera() {
-    if (walkThrough()->interpolator()->interpolationIsStarted())
+    if (walkThrough()->interpolator()->is_interpolation_started() || walkThrough()->status() != easy3d::WalkThrough::STOPPED )
         return;
 
     // get the camera parameters from clipboard string
@@ -1304,7 +1314,7 @@ void PaintCanvas::pasteCamera() {
     }
 
     //////////////////////////////////////////////////////////////////////////
-    // change view
+    // change view directly
     // 	camera()->setPosition(pos);
     // 	camera()->setOrientation(orient);
     // I prefer to make animation
