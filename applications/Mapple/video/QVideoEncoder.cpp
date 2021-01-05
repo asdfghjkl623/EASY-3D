@@ -338,6 +338,8 @@ bool QVideoEncoder::encodeImage(const QImage &image, int frameIndex, QString* er
 			av_make_error_string(errorStr, AV_ERROR_MAX_STRING_SIZE, ret);
 			if (errorString)
 				*errorString = QString("Error encoding video frame: %1").arg(errorStr);
+
+            av_packet_unref(&pkt);
 			return false;
 		}
 	}
@@ -351,6 +353,8 @@ bool QVideoEncoder::encodeImage(const QImage &image, int frameIndex, QString* er
 			av_make_error_string(errorStr, AV_ERROR_MAX_STRING_SIZE, ret);
 			if (errorString)
 				*errorString = QString("Error while writing video frame: %1").arg(errorStr);
+
+            av_packet_unref(&pkt);
 			return false;
 		}
 	}
@@ -401,7 +405,7 @@ bool QVideoEncoder::convertImage_sws(const QImage &image, QString* errorString/*
 	}
 
 	int num_bytes = av_image_get_buffer_size(AV_PIX_FMT_BGRA, m_width, m_height, 1);
-	if (num_bytes != image.byteCount())
+	if (num_bytes != image.sizeInBytes())
 	{
 		if (errorString)
 			*errorString = "[SWS] Number of bytes mismatch";

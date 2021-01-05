@@ -192,10 +192,13 @@ MainWindow::MainWindow(QWidget *parent)
     readSettings();
     updateWindowTitle();
 
-#if 0
-    QMessageBox::warning(this, "Mapple is not ready yet!",
-                         "Mapple is still under development. This version is not feature complete nor is fully tested. Using it is at your own risk.",
-                         QMessageBox::Ok);
+#ifndef NDEBUG  // temporal menus/tools
+		QToolBar* toolBarExperimental = new QToolBar(this);
+		addToolBar(toolBarExperimental);
+		QAction* actionTest1 = toolBarExperimental->addAction("Test1");
+		connect(actionTest1, SIGNAL(triggered()), this, SLOT(test1()));
+        QAction* actionTest2 = toolBarExperimental->addAction("Test2");
+        connect(actionTest2, SIGNAL(triggered()), this, SLOT(test2()));
 #endif
 }
 
@@ -673,11 +676,18 @@ void MainWindow::saveCameraStateToFile() {
             "All formats (*.*)"
     );
 
-    if (!fileName.isEmpty()) {
-        viewer_->saveStateToFile(fileName.toStdString());
-        // assume the user will soon restore the state from this file.
-        curDataDirectory_ = fileName.left(fileName.lastIndexOf("/"));
+    if (fileName.isEmpty())
+        return;
+
+    std::ofstream output(fileName.toStdString().c_str());
+    if (output.fail()) {
+        QMessageBox::warning(window(), tr("Save state to file error"), tr("Unable to create file %1").arg(fileName));
+        return;
     }
+
+    viewer_->saveStateToFile(output);
+    // assume the user will soon restore the state from this file.
+    curDataDirectory_ = fileName.left(fileName.lastIndexOf("/"));
 }
 
 
@@ -690,8 +700,17 @@ void MainWindow::restoreCameraStateFromFile() {
             "All formats (*.*)"
     );
 
-    if (!fileName.isEmpty())
-        viewer_->restoreStateFromFile(fileName.toStdString());
+    if (fileName.isEmpty())
+        return;
+
+    // read the state from file
+    std::ifstream input(fileName.toStdString().c_str());
+    if (input.fail()) {
+        QMessageBox::warning(this, tr("Read state file error"), tr("Unable to read file %1").arg(fileName));
+        return;
+    }
+
+    viewer_->restoreStateFromFile(input);
 }
 
 
@@ -1970,3 +1989,20 @@ void MainWindow::pointCloudDelaunayTriangulation3D() {
     updateUi();
     viewer_->update();
 }
+
+
+#ifndef NDEBUG
+void MainWindow::test1() {
+    float coeff = viewer_->camera()->zNearCoefficient();
+    viewer_->camera()->setZNearCoefficient(coeff + 0.005);
+    std::cout << "camera()->zNearCoefficient(): " << coeff << " -> " << coeff + 0.005 << std::endl;
+    viewer_->update();
+}
+
+void MainWindow::test2() {
+    float coeff = viewer_->camera()->zNearCoefficient();
+    viewer_->camera()->setZNearCoefficient(coeff - 0.001);
+    std::cout << "camera()->zNearCoefficient(): " << coeff << " -> " << coeff - 0.001 << std::endl;
+    viewer_->update();
+}
+#endif
