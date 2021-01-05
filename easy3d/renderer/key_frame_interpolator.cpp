@@ -24,13 +24,11 @@
 
 /** ----------------------------------------------------------
  *
- * the code is adapted from libQGLViewer with modifications.
+ * The code in this file is adapted from Surface_mesh with significant
+ * modifications and enhancement.
  *		- libQGLViewer (version Version 2.7.1, Nov 17th, 2017)
  * The original code is available at
- * http://libqglviewer.com/
- *
- * libQGLViewer is a C++ library based on Qt that eases the
- * creation of OpenGL 3D viewers.
+ *      http://libqglviewer.com/
  *
  *----------------------------------------------------------*/
 
@@ -294,12 +292,9 @@ namespace easy3d {
     }
 
 
-    bool KeyFrameInterpolator::save_keyframes(const std::string &file_name) const {
-        std::ofstream output(file_name.c_str());
-        if (output.fail()) {
-            LOG(ERROR) << "unable to open \'" << file_name << "\'";
+    bool KeyFrameInterpolator::save_keyframes(std::ostream& output) const {
+        if (output.fail())
             return false;
-        }
 
         output << "\tnum_key_frames: " << keyframes_.size() << std::endl;
 
@@ -314,12 +309,9 @@ namespace easy3d {
     }
 
 
-    bool KeyFrameInterpolator::read_keyframes(const std::string &file_name) {
-        std::ifstream input(file_name.c_str());
-        if (input.fail()) {
-            LOG(ERROR) << "unable to open \'" << file_name << "\'";
+    bool KeyFrameInterpolator::read_keyframes(std::istream& input) {
+        if (input.fail())
             return false;
-        }
 
         // clean
         delete_path();
@@ -447,12 +439,15 @@ namespace easy3d {
         if (pathIsValid_ || keyframes_.size() == 1)
             return interpolated_path_;
 
-        if (smoothing)
-            adjust_keyframe_times(keyframes_);
+        if (smoothing && interpolated_path_.size() > 2)
+            adjust_keyframe_times(keyframes_, true);
 
-        LOG_IF(INFO, keyframes_.size() > 2) << "interpolating " << keyframes_.size() << " keyframes...";
+        LOG_IF(INFO, keyframes_.size() > 2) << "interpolating " << keyframes_.size() << " keyframes";
         do_interpolate(interpolated_path_, keyframes_);
-        LOG_IF(INFO, keyframes_.size() > 2) << "keyframe interpolation done, " << interpolated_path_.size() << " frames";
+        LOG_IF(INFO, keyframes_.size() > 2)
+                        << "keyframe interpolation done: "
+                        << interpolated_path_.size() << " frames, "
+                        << duration() / interpolation_speed() << " seconds (at speed " << interpolation_speed() << "x)";
 
         if (smoothing && interpolated_path_.size() > 2) { // more iterations do not provide further improvement
             std::vector<Keyframe> as_key_frames;
@@ -461,24 +456,23 @@ namespace easy3d {
             as_key_frames.front().set_time(firstTime());
             as_key_frames.back().set_time(lastTime());
 
-            adjust_keyframe_times(as_key_frames);
+            adjust_keyframe_times(as_key_frames, false);
             do_interpolate(interpolated_path_, as_key_frames);
         }
 
         pathIsValid_ = true;
+        last_stopped_index_ = 0; // not valid any more
         return interpolated_path_;
     }
 
 
 //    int idx = 0;
-
     void KeyFrameInterpolator::do_interpolate(std::vector<Frame>& frames, std::vector<Keyframe>& keyframes) {
         frames.clear();
         if (keyframes.size() < 2)
             return;
 
 //        std::ofstream  output ("tmp-iner-" + std::to_string(idx++) + ".xyz");
-
         update_keyframe_values(keyframes);
 
         const float interval = interpolation_speed() * interpolation_period() / 1000.0f;
@@ -503,40 +497,70 @@ namespace easy3d {
                                        related[2]->tgQ(), related[2]->orientation(), alpha);
 
             frames.emplace_back(Frame(pos, q));
-
 //            output << pos << std::endl;
         }
     }
 
 
-    void KeyFrameInterpolator::adjust_keyframe_times(std::vector<Keyframe>& keyframes) {
+    void KeyFrameInterpolator::adjust_keyframe_times(std::vector<Keyframe>& keyframes, bool slower_turning) {
         if (keyframes.size() < 2)
             return;
 
-        auto distance_func = [](const Keyframe& f1, const Keyframe& f2) -> float {
-#if 0 // How to define a good distance function measuring the distance between two quaternions?
-            const float cos_angle = std::abs(quat::dot(f1.orientation(), f2.orientation()));
-            return distance(f1.position(), f2.position()) * cos_angle;
-#else // currently only the Euclidean distance between two positions.
-            return distance(f1.position(), f2.position());
-#endif
-        };
+        const float duration = keyframes.back().time() - keyframes.front().time();
 
-        std::vector<float> sub_lengths(keyframes.size(), 0.0f);
-        float total_length = 0.0f;
-        for (std::size_t i=1; i<keyframes.size(); ++i) {
-            total_length += distance_func(keyframes[i - 1], keyframes[i]);
-            sub_lengths[i] = total_length;
-        }
-        if (total_length < epsilon_sqr<float>())
-            total_length = 1.0f;
+        if (slower_turning) {   // make turning slower
+            // use step-distance-weighted keyframe timing + turning times.
+            // the time needed for turning from current orientation to the orientation of the next frame.
+            //  - 0 degree: 0 second
+            //  - 90 degrees: 1.0 second
+            // so we use 1 - acos(angle) to approximate this time
+            auto turning_time = [](const Keyframe &frame, const Keyframe &prev) -> float {
+                const float cos_angle = std::abs(quat::dot(frame.orientation(), prev.orientation()));
+                return (1.0f - cos_angle) * 10;
+            };
 
-        const float t0 = keyframes[0].time();
-        const float total_time = keyframes.back().time() - t0;
-        for (std::size_t i=1; i<keyframes.size()-1; ++i) { // don't modify the first and the last keyframes
-            const float t = t0 + sub_lengths[i] / total_length * total_time;
-            keyframes[i].set_time(t);
+            float path_length = 0.0f;
+            for (std::size_t i = 1; i < keyframes.size(); ++i)
+                path_length += distance(keyframes[i - 1].position(), keyframes[i].position());
+
+            const float t0 = keyframes[0].time();
+            double time = t0;
+            for (std::size_t i = 1; i < keyframes.size(); ++i) {
+                const float time_distance =
+                        distance(keyframes[i].position(), keyframes[i - 1].position()) / path_length * duration;
+                const float time_turning = turning_time(keyframes[i], keyframes[i - 1]);
+//                std::cout << "t: " << time_distance << ", " << time_turning << std::endl;
+                time += (time_distance + time_turning);
+                keyframes[i].set_time(time);
+            }
+
+            // then normalize so the duration is preserved
+            const float scale = duration / (keyframes.back().time() - keyframes.front().time());
+            for (std::size_t i = 0; i < keyframes.size(); ++i) {
+                float t = keyframes[i].time() * scale;
+                keyframes[i].set_time(t);
+            }
         }
+        else {  // use stride-length weighted keyframe timing
+            std::vector<float> sub_lengths(keyframes.size(), 0.0f);
+            float path_length = 0.0f;
+            for (std::size_t i = 1; i < keyframes.size(); ++i) {
+                path_length += distance(keyframes[i - 1].position(), keyframes[i].position());
+                sub_lengths[i] = path_length;
+            }
+            if (path_length < epsilon_sqr<float>())
+                path_length = 1.0f;
+
+            const float t0 = keyframes[0].time();
+            const float scale = duration / path_length;
+            for (std::size_t i = 1; i < keyframes.size() - 1; ++i) { // don't modify the first and the last keyframes
+                const float t = t0 + sub_lengths[i] * scale;
+                keyframes[i].set_time(t);
+            }
+        }
+
+//        std::cout << "keyframes.front().time(): " << keyframes.front().time() << std::endl;
+//        std::cout << "keyframes.back().time(): " << keyframes.back().time() << std::endl;
     }
 
 }

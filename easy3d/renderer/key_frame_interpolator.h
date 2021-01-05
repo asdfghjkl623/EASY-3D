@@ -332,9 +332,9 @@ namespace easy3d {
         //@{
     public:
         /// saves the camera path to a file
-        bool save_keyframes(const std::string& file_name) const;
+        bool save_keyframes(std::ostream& os) const;
         /// reads camera path from a file
-        bool read_keyframes(const std::string& file_name);
+        bool read_keyframes(std::istream& is);
         //@}
 
     private:
@@ -375,9 +375,10 @@ namespace easy3d {
         void compute_spline(const std::vector<Keyframe>::const_iterator* related, vec3& v1, vec3& v2) const;
         void do_interpolate(std::vector<Frame>& frames, std::vector<Keyframe>& keyframes);
 
-        // adjusts the keyframe times with respect to the accumulated path length
-        // so keyframes.front().time() and keyframes.back().time() are both preserved.
-        void adjust_keyframe_times(std::vector<Keyframe>& keyframes);
+        // stride-length weighted keyframe timing.
+        // both keyframes.front().time() and keyframes.back().time() are preserved.
+        // slower_turning: true to make turning slower
+        void adjust_keyframe_times(std::vector<Keyframe>& keyframes, bool slower_turning);
 #endif
 
     private:
