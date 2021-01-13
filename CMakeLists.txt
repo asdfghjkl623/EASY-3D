@@ -58,8 +58,8 @@ option(EASY3D_ENABLE_QT             "Build Qt-based examples/applications"  OFF)
 option(EASY3D_BUILD_TUTORIALS       "Build Easy3D Tutorials"                ON)
 # Build documentation
 option(EASY3D_BUILD_DOCUMENTATION   "Build Easy3D Documentation"            OFF)
-# Build sandbox
-option(EASY3D_BUILD_SANDBOX         "Build sandbox (for development)"       OFF)
+# Build tests
+option(EASY3D_BUILD_TESTS           "Build Easy3D Tests"                    OFF)
 
 ################################################################################
 
@@ -93,6 +93,23 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY  ${CMAKE_BINARY_DIR}/lib)
 
 ################################################################################
 
+# EasyLogging++: request all features
+add_definitions(-DELPP_FEATURE_ALL -DELPP_STL_LOGGING -DELPP_THREAD_SAFE)
+# EasyLogging++: for stack trace
+include(CheckIncludeFileCXX)
+check_include_file_cxx("execinfo.h" HAVE_EXECINFO)
+if (HAVE_EXECINFO)
+    add_definitions(-DHAVE_EXECINFO)
+endif()
+
+################################################################################
+# get a clean windows
+if (WIN32 OR MSVC)
+    add_definitions(-DNOMINMAX)
+endif()
+
+################################################################################
+
 add_subdirectory(3rd_party)
 
 add_subdirectory(easy3d)
@@ -101,8 +118,8 @@ if(EASY3D_BUILD_TUTORIALS)
     add_subdirectory(tutorials)
 endif()
 
-if(EASY3D_BUILD_SANDBOX)
-    add_subdirectory(sandbox)
+if(EASY3D_BUILD_TESTS)
+    add_subdirectory(test)
 endif()
 
 add_subdirectory(applications)

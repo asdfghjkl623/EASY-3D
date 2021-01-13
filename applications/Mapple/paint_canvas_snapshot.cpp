@@ -41,7 +41,7 @@
 
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/transform.h>
-#include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/core//model.h>
 #include <easy3d/util/logging.h>
@@ -113,7 +113,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
     const mat4 proj_matrix = camera()->projectionMatrix();
 
     // temporarily don't allow updating rendering when the camera parameters are changing.
-    easy3d::disconnect(&camera_->frame_modified, this);
+    easy3d::disconnect_all(&camera_->frame_modified);
 
     makeCurrent();
 
@@ -155,7 +155,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
 
             //---------------------------------------------------------------------------
 
-            // this very important (the progress bar may interfere the framebuffer
+            // this very important (the progress bar may interfere the framebuffer)
             makeCurrent();
 
             fbo->bind();
@@ -207,7 +207,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
         }
     }
 
-    // this very important (the progress bar may interfere the framebuffer
+    // this very important (the progress bar may interfere the framebuffer)
     makeCurrent();
     // clean
     delete fbo;
@@ -232,7 +232,7 @@ bool PaintCanvas::saveSnapshot(int w, int h, int samples, const QString &file_na
 void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rate, bool bk_white) {
     auto kfi = walkThrough()->interpolator();
     if (!kfi || kfi->number_of_keyframes() == 0) {
-        LOG_IF(WARNING, kfi->number_of_keyframes() == 0)
+        LOG_IF(kfi->number_of_keyframes() == 0, WARNING)
                         << "nothing to record (camera path is empty). You may import a camera path from a file or"
                            " creat it by adding keyframes";
         return;
@@ -252,7 +252,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
         camera_->setScreenWidthAndHeight(w, h);
 
     // temporarily don't allow updating rendering when the camera parameters are changing.
-    easy3d::disconnect(&camera_->frame_modified, this);
+    easy3d::disconnect_all(&camera_->frame_modified);
 
     const int bitrate = bit_rate * 1024 * 1024;
     const int gop = fps;
@@ -300,7 +300,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
         camera_->setPosition(f.position());
         camera_->setOrientation(f.orientation());
 
-        // this very important (the progress bar may interfere the framebuffer
+        // this very important (the progress bar may interfere the framebuffer)
         makeCurrent();
 
         fbo->bind();
@@ -346,7 +346,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
 #endif
     }
 
-    // this very important (the progress bar may interfere the framebuffer
+    // this very important (the progress bar may interfere the framebuffer)
     makeCurrent();
     // clean
     delete fbo;
@@ -357,7 +357,12 @@ void PaintCanvas::recordAnimation(const QString &file_name, int fps, int bit_rat
     encoder.close();
 
     // enable updating the rendering
-    easy3d::connect(&camera_->frame_modified, this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));
+    easy3d::connect(&camera_->frame_modified, this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));  // this works
+//    easy3d::connect(&camera_->frame_modified, this, overload<PaintCanvas>(&PaintCanvas::update));  // this also works
+//    camera_->frame_modified.connect(this, static_cast<void (PaintCanvas::*)(void)> (&PaintCanvas::update));  // this also works
+//    camera_->frame_modified.connect(this, overload<PaintCanvas>(&PaintCanvas::update));  // this also works
+//    camera_->frame_modified.connect(this, &PaintCanvas::update);  // this won't work due to overloading
+//    easy3d::connect(&camera_->frame_modified, this, &PaintCanvas::update);  // this won't work due to overloading
 
     // restore the viewer size
     if (w != original_width || h != original_height) {
@@ -395,7 +400,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_wh
         camera_->setScreenWidthAndHeight(w, h);
 
     // temporarily don't allow updating rendering when the camera parameters are changing.
-    easy3d::disconnect(&camera_->frame_modified, this);
+    easy3d::disconnect_all(&camera_->frame_modified);
 
     const int fw = w * dpi_scaling();
     const int fh = h * dpi_scaling();
@@ -432,7 +437,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_wh
         camera_->setPosition(f.position());
         camera_->setOrientation(f.orientation());
 
-        // this very important (the progress bar may interfere the framebuffer
+        // this very important (the progress bar may interfere the framebuffer)
         makeCurrent();
 
         fbo->bind();
@@ -474,7 +479,7 @@ void PaintCanvas::recordAnimation(const QString &file_name, int, int, bool bk_wh
 #endif
     }
 
-    // this very important (the progress bar may interfere the framebuffer
+    // this very important (the progress bar may interfere the framebuffer)
     makeCurrent();
     // clean
     delete fbo;

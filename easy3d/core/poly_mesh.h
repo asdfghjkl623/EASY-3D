@@ -26,6 +26,9 @@
 #define EASY3D_CORE_POLYHEDRAL_MESH_H
 
 #include <easy3d/core/model.h>
+
+#include <set>
+
 #include <easy3d/core/types.h>
 #include <easy3d/core/properties.h>
 
@@ -681,7 +684,6 @@ namespace easy3d {
         PolyMesh& assign(const PolyMesh& rhs);
         //@}
 
-        //!@}
         //! \name File IO
         //!@{
 
@@ -1331,11 +1333,23 @@ namespace easy3d {
         /// vector of vertex positions (read only)
         const std::vector<vec3>& points() const { return vpoint_.vector(); }
 
+        /// @brief vector of vertex positions
+        std::vector<vec3>& points() { return vpoint_.vector(); }
+
         /// compute face normals by calling compute_face_normal(HalfFace) for each face.
         void update_face_normals();
 
         /// compute normal vector of face \c h.
         vec3 compute_face_normal(HalfFace h) const;
+
+        /**
+         * Computes vertex normals for each vertex.
+         * \attention For vertices on the border of the polyhedral mesh, the normals point outside.
+         *      For interior vertices, vertex normals are not defined.
+         *      This method is not stable for concave vertices or vertices with spanning angles close to 0 or 180
+         *      degrees (but these are very rare cases for polyhedral meshes).
+         */
+        void update_vertex_normals();
 
         /// compute the length of edge \c e.
         float edge_length(Edge e) const;

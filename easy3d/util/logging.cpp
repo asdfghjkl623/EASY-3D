@@ -24,85 +24,152 @@
 
 #include <easy3d/util/logging.h>
 #include <easy3d/util/file_system.h>
+#include <easy3d/util/stack_tracer.h>
 
-#include <3rd_party/glog/src/utilities.h>
 
-#include <iostream>
+INITIALIZE_EASYLOGGINGPP
 
 
 namespace easy3d
 {
 
-	namespace logging
-	{
+    namespace logging
+    {
 
-		void initialize(bool severity_dependent, const std::string& log_dir, int stderr_threshold)
-		{
-			// Ensures the library will not be initialized more than once.
-			if (google::glog_internal_namespace_::IsGoogleLoggingInitialized())
-				return;
+        std::string log_file_name = "";
 
-			// use "static" to make sure the string still exist outside this function (glog is multi threaded).
-            static std::string app_path = file_system::executable();
 
-			std::string log_path = log_dir;
-			if (log_path.empty())
-			{
-				log_path = app_path;
-#ifdef __APPLE__
-				// macOS may put the executable file in an application bundle, e.g., "PolyFit.app/Contents/MacOS/PolyFit"
-				std::string::size_type pos = log_path.find(".app");
-				if (pos != std::string::npos)
-					log_path = log_path.substr(0, pos);
+        std::string stacktrace_failure_header() {
+            auto compose_header = []() -> std::string {
+                std::stringstream stream;
+                stream << "================================================================================="
+                       << "\nEasy3D has encountered a fatal error and has to abort. ";
+
+                if (!log_file_name.empty()) { // a log file exists
+                    stream << "The error has been recorded \n"
+                           << "in the log file [" + easy3d::file_system::absolute_path(log_file_name) + "].";
+                }
+
+                stream << "\nPlease report this issue with the complete log, a description of how to reproduce";
+                stream << "\nthe issue, and possibly your data to Liangliang Nan (liangliang.nan@gmail.com).";
+                stream << "\n=================================================================================";
+                stream << "\n*** Check failure stack trace (most recent call first): ***";
+                return stream.str();
+            };
+            static std::string header = compose_header();
+            return header;
+        }
+
+
+        static std::string crashReason(int sig) {
+            std::stringstream ss;
+            bool foundReason = false;
+            for (int i = 0; i < el::base::consts::kCrashSignalsCount; ++i) {
+                if (el::base::consts::kCrashSignals[i].numb == sig) {
+                    ss << "Application has crashed due to [" << el::base::consts::kCrashSignals[i].name << "] signal";
+                    if (ELPP->hasFlag(el::LoggingFlag::LogDetailedCrashReason)) {
+                        ss << std::endl <<
+                           "    " << el::base::consts::kCrashSignals[i].brief << std::endl <<
+                           "    " << el::base::consts::kCrashSignals[i].detail;
+                    }
+                    foundReason = true;
+                }
+            }
+            if (!foundReason) {
+                ss << "Application has crashed due to unknown signal [" << sig << "]";
+            }
+            return ss.str();
+        }
+
+        void myCrashHandler(int sig) {
+#if 0
+            el::Helpers::logCrashReason(sig, true);
+#else
+            std::stringstream ss;
+            ss << crashReason(sig) << "\n"
+               << stacktrace_failure_header() << "\n"
+//               << el::base::debug::StackTrace();
+                << StackTracer::back_trace_string(32, 5); // more reliable and readable than el
+
+            LOG(FATAL) << ss.str();
 #endif
-				log_path = file_system::parent_directory(log_path) + "/logs";
-			}
-            else    // always append a separator in case the user forgot it
-                log_path = log_dir + file_system::native_path_separator();
-
-			if (!file_system::is_directory(log_path))
-				file_system::create_directory(log_path);
-			LOG_IF(ERROR, !file_system::is_directory(log_path)) << "could not create log directory: " << log_path;
-
-			if (severity_dependent) // create a log file for each severity level
-				FLAGS_log_dir = log_path;
-			else {
-			    const std::string& dest = log_path + "/" + file_system::base_name(app_path) + "-";
-                google::SetLogDestination(google::GLOG_INFO, dest.c_str());
-			}
-
-			FLAGS_stderrthreshold = stderr_threshold;
-			FLAGS_colorlogtostderr = true;
-			google::InitGoogleLogging(app_path.c_str());
-
-//            auto failure_dump = [](const char* data, int size) -> void {
-//                LOG(ERROR) << std::string(data, size)
-//                << "\n-----------------------------------------\n"
-//                   "Oh, Easy3D crashed. Please contact me (liangliang.nan@gmail.com) for more information.";
-//            };
-//            google::InstallFailureWriter(failure_dump);
-
-			DLOG(INFO) << "logger initialized";
-			DLOG(INFO) << "executable path: " << file_system::executable_directory();
-			DLOG(INFO) << "current working dir: " << file_system::current_working_directory();
-		}
+            // FOLLOWING LINE IS ABSOLUTELY NEEDED AT THE END IN ORDER TO ABORT APPLICATION
+            el::Helpers::crashAbort(sig);
+        }
 
 
 
-        LogClient::LogClient() {
-		    google::AddLogSink(this);
-		}
-
-
-        void LogClient::send(google::LogSeverity severity, const char *full_filename,
-                  const char *base_filename, int line,
-                  const struct ::tm *tm_time,
-                  const char *message, size_t message_len)
+        void initialize(bool verbose, const std::string &log_file)
         {
-		    if (message && message_len > 0)
-                send(severity, std::string(message, message + message_len));
-		}
-	}
+            std::string full_path = log_file;
+            if (log_file == "default") {
+                const std::string app_path = file_system::executable();
+                std::string log_path = app_path;
+#ifdef __APPLE__
+                // macOS may put the executable file in an application bundle, e.g., "PolyFit.app/Contents/MacOS/PolyFit"
+                std::string::size_type pos = log_path.find(".app");
+                if (pos != std::string::npos)
+                    log_path = log_path.substr(0, pos);
+#endif
+                log_path = file_system::parent_directory(log_path) + "/logs";
+
+                if (!file_system::is_directory(log_path))
+                    file_system::create_directory(log_path);
+                full_path = log_path + "/" + file_system::base_name(app_path) + ".log";
+            }
+
+            if (!full_path.empty()) {
+                std::ofstream output(full_path.c_str(), std::ios::app);
+                if (output.is_open()) {
+                    auto size_bytes = static_cast<std::size_t>(output.tellp());
+                    if (size_bytes > 0)
+                        output << "\n\n";
+                    output << "================================================================= program started ...\n";
+                    output.close();
+                    log_file_name = full_path;
+                }
+            }
+
+//            // configures existing logger - everything in global.conf
+//            el::Loggers::configureFromGlobal("global.conf");
+
+            el::Configurations defaultConf;
+            defaultConf.setToDefault();
+            // Values are always std::string
+            defaultConf.setGlobally(el::ConfigurationType::Format, "%levshort %datetime{%d/%M/%Y %h:%m:%s.%g} %fbase:%line] %msg");
+
+            if (!log_file_name.empty()) {
+                defaultConf.setGlobally(el::ConfigurationType::Filename, log_file_name);
+                defaultConf.setGlobally(el::ConfigurationType::MaxLogFileSize, std::string("1048576")); // 1024 * 1024 = 1M
+            }
+            else
+                defaultConf.setGlobally(el::ConfigurationType::ToFile, std::string("false"));
+
+            defaultConf.set(el::Level::Info, el::ConfigurationType::ToStandardOutput, verbose ? "true" : "false");
+
+            // If you wish to have a configuration for existing and future loggers, you can use the following.
+            // This is useful when you are working on fairly large scale, or using a third-party library that is
+            // already using Easylogging++. Any newly created logger will use default configurations. If you wish
+            // to configure existing loggers as well, you can set second argument to true (it defaults to false).
+            el::Loggers::setDefaultConfigurations(defaultConf, false);
+
+            el::Loggers::addFlag(el::LoggingFlag::ColoredTerminalOutput);
+            el::Loggers::addFlag(el::LoggingFlag::LogDetailedCrashReason);
+
+            // default logger uses default configurations
+            el::Loggers::reconfigureLogger("default", defaultConf);
+
+            el::Helpers::setCrashHandler(myCrashHandler);
+
+            LOG(INFO) << "executable path: " << file_system::executable_directory();
+            LOG(INFO) << "current working dir: " << file_system::current_working_directory();
+        }
+
+
+        Logger::Logger() {
+            el::base::elStorage->installLogDispatchCallback(this);
+        }
+
+    }
 
 }
-

@@ -27,6 +27,7 @@
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/graph.h>
 #include <easy3d/core/surface_mesh.h>
+#include <easy3d/core/poly_mesh.h>
 #include <easy3d/renderer/opengl_error.h>
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/camera.h>
@@ -45,8 +46,6 @@ namespace easy3d {
 
 
     ModelPicker::~ModelPicker() {
-        delete fbo_;
-        fbo_ = nullptr;
     }
 
 
@@ -129,6 +128,10 @@ namespace easy3d {
             else if (dynamic_cast<Graph *>(model)) {
                 draw(model->renderer()->get_points_drawable("vertices"), color);
                 draw(model->renderer()->get_lines_drawable("edges"), color);
+            }
+            else if (dynamic_cast<PolyMesh *>(model)) {
+                draw(model->renderer()->get_triangles_drawable("faces:border"), color);
+                draw(model->renderer()->get_triangles_drawable("faces:interior"), color);
             }
         }
     }

@@ -31,6 +31,7 @@
 #include <easy3d/renderer/framebuffer_object.h>
 #include <easy3d/renderer/opengl_error.h>
 #include <easy3d/renderer/drawable_points.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/renderer/opengl_info.h>
 #include <easy3d/util/logging.h>
 
@@ -60,14 +61,14 @@ namespace easy3d {
                 if (program)
                     return pick_vertices_gpu(model, rect, deselect, program);
                 else {
-                    LOG_FIRST_N(ERROR, 1)
-                        << "shader program not available, default to CPU implementation (this is the first record)";
+                    LOG_FIRST_N(1, ERROR)
+                        << "shader program not available, default to CPU implementation. " << COUNTER;
                 }
             }
             else {
-                LOG_FIRST_N(WARNING, 1)
+                LOG_FIRST_N(1, WARNING)
                     << "GPU implementation requires OpenGL 4.3 or higher (available is "
-                    << OpenglInfo::gl_version_number() << "), default to CPU implementation (this is the first record)";
+                    << OpenglInfo::gl_version_number() << "), default to CPU implementation. " << COUNTER;
             }
         }
 
@@ -92,13 +93,13 @@ namespace easy3d {
                 if (program)
                     return pick_vertices_gpu(model, plg, deselect, program);
                 else {
-                    LOG_FIRST_N(ERROR, 1)
-                        << "shader program not available, default to CPU implementation (this is the first record)";
+                    LOG_FIRST_N(1, ERROR)
+                        << "shader program not available, default to CPU implementation. " << COUNTER;
                 }
             } else {
-                LOG_FIRST_N(WARNING, 1)
+                LOG_FIRST_N(1, WARNING)
                     << "GPU implementation requires OpenGL 4.3 or higher (available is "
-                    << OpenglInfo::gl_version_number() << "), default to CPU implementation (this is the first record)";
+                    << OpenglInfo::gl_version_number() << "), default to CPU implementation. " << COUNTER;
             }
         }
 
@@ -123,7 +124,7 @@ namespace easy3d {
 
         const auto &points = model->get_vertex_property<vec3>("v:point").vector();
         int num = static_cast<int>(points.size());
-        const mat4 &m = camera()->modelViewProjectionMatrix();
+        const mat4 &m = camera()->modelViewProjectionMatrix() * model->manipulator()->matrix();
 
         auto &select = model->vertex_property<bool>("v:select").vector();
 
@@ -154,7 +155,7 @@ namespace easy3d {
 
         auto drawable = model->renderer()->get_points_drawable("vertices");
         if (!drawable) {
-            LOG_FIRST_N(WARNING, 1) << "drawable 'vertices' does not exist";
+            LOG_FIRST_N(1, WARNING) << "drawable 'vertices' does not exist. " << COUNTER;
             return 0;
         }
 
@@ -164,7 +165,7 @@ namespace easy3d {
         glGetIntegerv(GL_VIEWPORT, viewport);
 
         vec4 rectangle(rect.x_min(), rect.x_max(), rect.y_min(), rect.y_max());
-        const mat4 &MVP = camera()->modelViewProjectionMatrix();
+        const mat4 &MVP = camera()->modelViewProjectionMatrix() * model->manipulator()->matrix();
 
         program->bind();
         program->set_uniform("viewport", viewport);
@@ -208,16 +209,16 @@ namespace easy3d {
         }
 
         const Box2& box = plg.bbox();
-        float xmin = box.min().x / (win_width - 1.0f);
-        float ymin = 1.0f - box.min().y / (win_height - 1.0f);
-        float xmax = box.max().x / (win_width - 1);
-        float ymax = 1.0f - box.max().y / (win_height - 1.0f);
+        float xmin = box.min_point().x / (win_width - 1.0f);
+        float ymin = 1.0f - box.min_point().y / (win_height - 1.0f);
+        float xmax = box.max_point().x / (win_width - 1);
+        float ymax = 1.0f - box.max_point().y / (win_height - 1.0f);
         if (xmin > xmax) std::swap(xmin, xmax);
         if (ymin > ymax) std::swap(ymin, ymax);
 
         const auto &points = model->get_vertex_property<vec3>("v:point").vector();
         int num = static_cast<int>(points.size());
-        const mat4 &m = camera()->modelViewProjectionMatrix();
+        const mat4 &m = camera()->modelViewProjectionMatrix() * model->manipulator()->matrix();
 
         auto &select = model->vertex_property<bool>("v:select").vector();
 
@@ -254,7 +255,7 @@ namespace easy3d {
 
         auto drawable = model->renderer()->get_points_drawable("vertices");
         if (!drawable) {
-            LOG_FIRST_N(WARNING, 1) << "drawable 'vertices' does not exist";
+            LOG_FIRST_N(1, WARNING) << "drawable 'vertices' does not exist. " << COUNTER;
             return 0;
         }
 
@@ -272,7 +273,8 @@ namespace easy3d {
 
         program->bind();
         program->set_uniform("viewport", viewport);
-        program->set_uniform("MVP", camera()->modelViewProjectionMatrix());
+        program->set_uniform("MVP", camera()->modelViewProjectionMatrix())
+                ->set_uniform("MANIP", model->manipulator()->matrix());
         program->set_uniform("deselect", deselect);
         drawable->gl_draw(true);
         program->release();

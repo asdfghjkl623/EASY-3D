@@ -50,9 +50,13 @@
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/clipping_plane.h>
-#include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/drawable_lines.h>
+#include <easy3d/renderer/drawable_points.h>
+#include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/renderer/drawable_triangles.h>
+#include <easy3d/renderer/manipulator.h>
+#include <easy3d/renderer/transform.h>
 #include <easy3d/fileio/point_cloud_io.h>
 #include <easy3d/fileio/graph_io.h>
 #include <easy3d/fileio/surface_mesh_io.h>
@@ -191,15 +195,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     readSettings();
     updateWindowTitle();
-
-#ifndef NDEBUG  // temporal menus/tools
-		QToolBar* toolBarExperimental = new QToolBar(this);
-		addToolBar(toolBarExperimental);
-		QAction* actionTest1 = toolBarExperimental->addAction("Test1");
-		connect(actionTest1, SIGNAL(triggered()), this, SLOT(test1()));
-        QAction* actionTest2 = toolBarExperimental->addAction("Test2");
-        connect(actionTest2, SIGNAL(triggered()), this, SLOT(test2()));
-#endif
 }
 
 
@@ -227,27 +222,28 @@ void MainWindow::notify(std::size_t percent, bool update_viewer) {
 }
 
 
-void MainWindow::send(int severity, const std::string &message) {
+void MainWindow::send(el::Level level, const std::string &msg) {
     static QMutex mutex;
     mutex.lock();
     std::string line("");
-	switch (severity) {
-        case 0:
-            ui->listWidgetLog->addItem(QString::fromStdString("[INFO] " + message));
+	switch (level) {
+        case el::Level::Info:
+            ui->listWidgetLog->addItem(QString::fromStdString("[INFO] " + msg));
             ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::black);
             break;
-        case 1:
-            ui->listWidgetLog->addItem(QString::fromStdString("[WARNING] " + message));
+        case el::Level::Warning:
+            ui->listWidgetLog->addItem(QString::fromStdString("[WARNING] " + msg));
             ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkBlue);
             break;
-        case 2:
-            ui->listWidgetLog->addItem(QString::fromStdString("[ERROR] " + message));
+        case el::Level::Error:
+            ui->listWidgetLog->addItem(QString::fromStdString("[ERROR] " + msg));
             ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkMagenta);
             break;
-        case 3:
-            ui->listWidgetLog->addItem(QString::fromStdString("[FATAL] " + message));
+        case el::Level::Fatal:
+            ui->listWidgetLog->addItem(QString::fromStdString("[FATAL] " + msg));
             ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::red);
             break;
+        default: break;
     }
 
     ui->listWidgetLog->scrollToBottom();
@@ -867,6 +863,7 @@ void MainWindow::createActionsForViewMenu() {
 
 void MainWindow::createActionsForCameraMenu() {
     connect(ui->actionPerspectiveOrthographic, SIGNAL(toggled(bool)), viewer_, SLOT(setPerspective(bool)));
+    connect(ui->actionFitScreen, SIGNAL(triggered()), viewer_, SLOT(fitScreen()));
     connect(ui->actionSnapshot, SIGNAL(triggered()), this, SLOT(saveSnapshot()));
 
     connect(ui->actionCopyCamera, SIGNAL(triggered()), viewer_, SLOT(copyCamera()));
@@ -888,10 +885,14 @@ void MainWindow::createActionsForPropertyMenu() {
 
 void MainWindow::createActionsForEditMenu() {
     connect(ui->actionAddGaussianNoise, SIGNAL(triggered()), this, SLOT(addGaussianNoise()));
+    connect(ui->actionApplyManipulatedTransformation, SIGNAL(triggered()), this, SLOT(applyManipulatedTransformation()));
+    connect(ui->actionGiveUpManipulatedTransformation, SIGNAL(triggered()), this, SLOT(giveUpManipulatedTransformation()));
 }
 
 
 void MainWindow::createActionsForSelectMenu() {
+    connect(ui->actionSelectModel, SIGNAL(toggled(bool)), viewer_, SLOT(enableSelectModel(bool)));
+
     connect(ui->actionInvertSelection, SIGNAL(triggered()), viewer_, SLOT(invertSelection()));
     connect(ui->actionDeleteSelectedPrimitives, SIGNAL(triggered()), viewer_, SLOT(deleteSelectedPrimitives()));
 
@@ -1366,8 +1367,8 @@ void MainWindow::surfaceMeshSlice() {
 
 #else   // slices using a set of horizontal planes
 
-    float minz = mesh->bounding_box().min().z;
-    float maxz = mesh->bounding_box().max().z;
+    float minz = mesh->bounding_box().min_point().z;
+    float maxz = mesh->bounding_box().max_point().z;
 
     int num = 10;
     float step = (maxz - minz) / num;
@@ -1377,6 +1378,8 @@ void MainWindow::surfaceMeshSlice() {
         planes[i] = Plane3(vec3(0, 0, minz + i * step), vec3(0, 0, 1));
 
     const std::vector< std::vector<Surfacer::Polyline> >& all_polylines = Surfacer::slice(mesh, planes);
+    if (all_polylines.empty())
+        return;
 
     Graph* graph = new Graph;
     for (const auto& polylines : all_polylines) {
@@ -1402,6 +1405,18 @@ void MainWindow::surfaceMeshSlice() {
 
     graph->set_name(file_system::base_name(mesh->name()) + "-slice");
     viewer()->addModel(graph);
+
+    auto edges = graph->renderer()->get_lines_drawable("edges");
+    edges->set_line_width(2.0f);
+    edges->set_uniform_coloring(vec4(1, 0, 0, 1));
+    LOG(INFO) << "color information added to visualize individual polylines of the slice";
+    edges->set_coloring(easy3d::State::COLOR_PROPERTY, easy3d::State::EDGE, "e:color");
+
+    auto vertices = graph->renderer()->get_points_drawable("vertices");
+    vertices->set_uniform_coloring(vec4(0, 1, 0, 1));
+    vertices->set_point_size(4.0f);
+    vertices->set_visible(false);
+
     ui->treeWidgetModels->addModel(graph, false);
 #endif
 
@@ -1425,7 +1440,7 @@ void MainWindow::pointCloudEstimateNormals() {
         return;
 
     PointCloudNormals pcn;
-    std::cout << "show the parameter dialog" << std::endl;
+    LOG(WARNING) << "TODO: add a dialog for parameter tuning" << std::endl;
     pcn.estimate(cloud);
 
     cloud->renderer()->update();
@@ -1439,7 +1454,7 @@ void MainWindow::pointCloudReorientNormals() {
         return;
 
     PointCloudNormals pcn;
-    std::cout << "show the parameter dialog" << std::endl;
+    LOG(WARNING) << "TODO: add a dialog for parameter tuning" << std::endl;
     pcn.reorient(cloud);
 
     cloud->renderer()->update();
@@ -1618,6 +1633,59 @@ void MainWindow::computeHeightField() {
             e_height_z[e] = c.z;
         }
     }
+    // add 3 scalar fields defined on vertices, edges, and faces respectively.
+    else if (dynamic_cast<PolyMesh*>(model)) {
+        PolyMesh* mesh = dynamic_cast<PolyMesh*>(model);
+
+        ProgressLogger progress(4, false, false);
+
+        auto v_height_x = mesh->vertex_property<float>("v:height_x");
+        auto v_height_y = mesh->vertex_property<float>("v:height_y");
+        auto v_height_z = mesh->vertex_property<float>("v:height_z");
+        for (auto v : mesh->vertices()) {
+            const auto& p = mesh->position(v);
+            v_height_x[v] = p.x;
+            v_height_y[v] = p.y;
+            v_height_z[v] = p.z;
+        }
+        progress.next();
+
+        auto e_height_x = mesh->edge_property<float>("e:height_x");
+        auto e_height_y = mesh->edge_property<float>("e:height_y");
+        auto e_height_z = mesh->edge_property<float>("e:height_z");
+        for (auto e : mesh->edges()) {
+            const auto& s = mesh->vertex(e, 0);
+            const auto& t = mesh->vertex(e, 1);
+            const auto& c = 0.5 * (mesh->position(s) + mesh->position(t));
+            e_height_x[e] = c.x;
+            e_height_y[e] = c.y;
+            e_height_z[e] = c.z;
+        }
+        progress.next();
+
+        auto f_height_x = mesh->face_property<float>("f:height_x");
+        auto f_height_y = mesh->face_property<float>("f:height_y");
+        auto f_height_z = mesh->face_property<float>("f:height_z");
+        for (auto f : mesh->faces()) {
+            vec3 c(0,0,0);
+            float count = 0.0f;
+            for (auto v : mesh->vertices(f)) {
+                c += mesh->position(v);
+                ++count;
+            }
+            c /= count;
+            f_height_x[f] = c.x;
+            f_height_y[f] = c.y;
+            f_height_z[f] = c.z;
+        }
+        progress.next();
+
+        // add a vector field to the faces
+        mesh->update_face_normals();
+        auto fnormals = mesh->get_face_property<vec3>("f:normal");
+        progress.next();
+    }
+
 
     model->renderer()->update();
     viewer()->update();
@@ -1785,6 +1853,47 @@ void MainWindow::addGaussianNoise() {
 }
 
 
+void MainWindow::applyManipulatedTransformation() {
+    Model* model = viewer_->currentModel();
+    if (!model)
+        return;
+
+    mat4 manip = model->manipulator()->matrix();
+    auto& points = model->points();
+    for (auto& p : points)
+        p = manip * p;
+
+    if (dynamic_cast<SurfaceMesh*>(model)) {
+        dynamic_cast<SurfaceMesh *>(model)->update_vertex_normals();
+    }
+    else if (dynamic_cast<PointCloud*>(model)) {
+        PointCloud* cloud = dynamic_cast<PointCloud*>(model);
+        auto normal = cloud->get_vertex_property<vec3>("v:normal");
+        if (normal) {
+            const mat3& N = transform::normal_matrix(manip);
+            for (auto v : cloud->vertices())
+                normal[v] = N * normal[v];
+            // vector fields...
+        }
+    }
+
+    model->manipulator()->reset();
+    model->renderer()->update(false);
+    viewer_->update();
+}
+
+
+void MainWindow::giveUpManipulatedTransformation() {
+    Model* model = viewer_->currentModel();
+    if (!model)
+        return;
+
+    model->manipulator()->reset();
+    model->renderer()->update(false);
+    viewer_->update();
+}
+
+
 void MainWindow::computeSurfaceMeshCurvatures() {
     static DialogSurfaceMeshCurvature* dialog = nullptr;
     if (!dialog)
@@ -1847,9 +1956,14 @@ void MainWindow::animation() {
         dialog = new DialogWalkThrough(this);
 
     dialog->walkThrough()->start_walking(viewer_->models());
+
+    // don't allow model picking when creating camera paths.
+    ui->actionSelectModel->setChecked(false);
+    for (auto m : viewer_->models())
+        m->renderer()->set_selected(false);
+
     dialog->show();
 }
-
 
 
 void MainWindow::surfaceMeshGeodesic() {
@@ -1945,7 +2059,7 @@ void MainWindow::pointCloudDelaunayTriangulation3D() {
         mesh->add_vertex(points[i]);
     }
 
-    LOG(INFO) << "building tetrahedral mesh with " << delaunay.nb_tets() << " tetrahedra..." << std::endl;
+    LOG(INFO) << "building tetrahedral mesh with " << delaunay.nb_tets() << " tetrahedra...";
     StopWatch w;
     for (unsigned int i = 0; i < delaunay.nb_tets(); i++) {
         PolyMesh::Vertex vts[4];
@@ -1957,26 +2071,9 @@ void MainWindow::pointCloudDelaunayTriangulation3D() {
         }
         mesh->add_tetra(vts[0], vts[1], vts[2], vts[3]);
     }
-    LOG(INFO) << "done. " << w.time_string() << std::endl;
+    LOG(INFO) << "done. " << w.time_string();
 
     viewer_->addModel(mesh);
     updateUi();
     viewer_->update();
 }
-
-
-#ifndef NDEBUG
-void MainWindow::test1() {
-    float coeff = viewer_->camera()->zNearCoefficient();
-    viewer_->camera()->setZNearCoefficient(coeff + 0.005);
-    std::cout << "camera()->zNearCoefficient(): " << coeff << " -> " << coeff + 0.005 << std::endl;
-    viewer_->update();
-}
-
-void MainWindow::test2() {
-    float coeff = viewer_->camera()->zNearCoefficient();
-    viewer_->camera()->setZNearCoefficient(coeff - 0.001);
-    std::cout << "camera()->zNearCoefficient(): " << coeff << " -> " << coeff - 0.001 << std::endl;
-    viewer_->update();
-}
-#endif

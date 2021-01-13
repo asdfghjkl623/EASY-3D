@@ -38,18 +38,15 @@
 #include <easy3d/renderer/manipulated_camera_frame.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/renderer/ambient_occlusion.h>
-#include <easy3d/renderer/soft_shadow.h>
 #include <easy3d/renderer/dual_depth_peeling.h>
-#include <easy3d/renderer/eye_dome_lighting.h>
 #include <easy3d/renderer/read_pixel.h>
 #include <easy3d/renderer/opengl_info.h>
 #include <easy3d/renderer/opengl_error.h>
 #include <easy3d/renderer/setting.h>
-#include <easy3d/renderer/clipping_plane.h>
 #include <easy3d/renderer/texture_manager.h>
 #include <easy3d/renderer/text_renderer.h>
-#include <easy3d/renderer/buffers.h>
 #include <easy3d/renderer/renderer.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/renderer/opengl_timer.h>
 #include <easy3d/fileio/resources.h>
 #include <easy3d/fileio/surface_mesh_io.h>
@@ -60,7 +57,6 @@
 #include <QPainter>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
-#include <QOpenGLFramebufferObject>
 #include <QOpenGLFramebufferObjectFormat>
 #include <QApplication>
 #include <QClipboard>
@@ -106,6 +102,7 @@ void ViewerQt::cleanup() {
 
     for (auto m : models_) {
         delete m->renderer();
+        delete m->manipulator();
         delete m;
     }
 
@@ -229,8 +226,7 @@ void ViewerQt::mousePressEvent(QMouseEvent *e) {
 
                 // show, but hide the visual hint of pivot point after \p delay milliseconds.
                 show_pivot_point_ = true;
-                const int delay = 10000;
-                Timer::single_shot(delay, [&]() {
+                Timer<>::single_shot(10000, [&]() {
                     show_pivot_point_ = false;
                     update();
                 });
@@ -285,9 +281,9 @@ void ViewerQt::mouseMoveEvent(QMouseEvent *e) {
             int dx = x - mouse_previous_pos_.x();
             int dy = y - mouse_previous_pos_.y();
             if (pressed_button_ == Qt::LeftButton)
-                camera_->frame()->action_rotate(x, y, dx, dy, camera_, e->modifiers() == Qt::AltModifier);
+                camera_->frame()->action_rotate(x, y, dx, dy, camera_, ManipulatedFrame::NONE);
             else if (pressed_button_ == Qt::RightButton)
-                camera_->frame()->action_translate(x, y, dx, dy, camera_, e->modifiers() == Qt::AltModifier);
+                camera_->frame()->action_translate(x, y, dx, dy, camera_, ManipulatedFrame::NONE);
             else if (pressed_button_ == Qt::MidButton) {
                 if (dy != 0)
                     camera_->frame()->action_zoom(dy > 0 ? 1 : -1, camera_);
@@ -430,7 +426,7 @@ void ViewerQt::keyPressEvent(QKeyEvent *e) {
         Box3 box;
         for (auto m : models_)
             box.add_box(m->bounding_box());
-        camera_->setSceneBoundingBox(box.min(), box.max());
+        camera_->setSceneBoundingBox(box.min_point(), box.max_point());
     } else if (e->key() == Qt::Key_K && e->modifiers() == Qt::ControlModifier) { // play the path
         if (camera()->keyframe_interpolator()->is_interpolation_started())
             camera()->keyframe_interpolator()->stop_interpolation();
@@ -685,6 +681,8 @@ void ViewerQt::addModel(Model *model) {
 
     auto renderer = new Renderer(model);
     model->set_renderer(renderer);
+    auto manipulator = new Manipulator(model);
+    model->set_manipulator(manipulator);
 
     int pre_idx = model_idx_;
     models_.push_back(model);
@@ -735,7 +733,7 @@ void ViewerQt::fitScreen(const Model *model) {
         for (auto m : models_)
             box.add_box(m->bounding_box());
     }
-    camera_->setSceneBoundingBox(box.min(), box.max());
+    camera_->setSceneBoundingBox(box.min_point(), box.max_point());
     camera_->showEntireScene();
     update();
 }

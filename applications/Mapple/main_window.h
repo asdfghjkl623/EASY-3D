@@ -54,7 +54,7 @@ namespace easy3d {
 }
 
 
-class MainWindow : public QMainWindow, public easy3d::ProgressClient, public easy3d::logging::LogClient
+class MainWindow : public QMainWindow, public easy3d::ProgressClient, public easy3d::logging::Logger
 {
     Q_OBJECT
 
@@ -101,6 +101,8 @@ public slots:
 
     // edit
     void addGaussianNoise();
+    void applyManipulatedTransformation();
+    void giveUpManipulatedTransformation();
 
     // point cloud
     void pointCloudDownsampling();
@@ -159,12 +161,6 @@ public slots:
     void onAbout();
     void showManual();
 
-#ifndef NDEBUG
-    void test1();
-    void test2();
-#endif
-
-
 protected:
     void dragEnterEvent(QDragEnterEvent *e) override;
     void dropEvent(QDropEvent *) override;
@@ -196,7 +192,8 @@ private:
     QString strippedName(const QString &fullFileName);
 
     void notify(std::size_t percent, bool update_viewer) override;
-    void send(int severity, const std::string &message) override;
+
+    void send(el::Level level, const std::string &msg) override;
 
 private:
     PaintCanvas*   viewer_;

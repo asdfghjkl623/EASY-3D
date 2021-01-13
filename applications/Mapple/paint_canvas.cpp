@@ -52,9 +52,11 @@
 #include <easy3d/renderer/clipping_plane.h>
 #include <easy3d/renderer/texture_manager.h>
 #include <easy3d/renderer/text_renderer.h>
-#include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/walk_through.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/fileio/resources.h>
 #include <easy3d/gui/picker_surface_mesh.h>
+#include <easy3d/gui/picker_model.h>
 #include <easy3d/util/file_system.h>
 #include <easy3d/util/logging.h>
 #include <easy3d/util/string.h>
@@ -91,6 +93,9 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , show_pivot_point_(false)
         , drawable_axes_(nullptr)
         , show_labels_under_mouse_(false)
+        , model_picker_(nullptr)
+        , allow_select_model_(false)
+        , surface_mesh_picker_(nullptr)
         , picked_face_index_(-1)
         , show_coordinates_under_mouse_(false)
         , model_idx_(-1)
@@ -129,6 +134,7 @@ PaintCanvas::~PaintCanvas() {
 void PaintCanvas::cleanup() {
     for (auto m : models_) {
         delete m->renderer();
+        delete m->manipulator();
         delete m;
     }
 
@@ -140,6 +146,8 @@ void PaintCanvas::cleanup() {
     delete transparency_;
     delete edl_;
     delete texter_;
+    delete model_picker_;
+    delete surface_mesh_picker_;
 
     ShaderManager::terminate();
     TextureManager::terminate();
@@ -282,8 +290,7 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
                     camera_->setPivotPoint(p);
                     // show, but hide the visual hint of pivot point after \p delay milliseconds.
                     show_pivot_point_ = true;
-                    const int delay = 10000;
-                    Timer::single_shot(delay, [&]() {
+                    Timer<>::single_shot(10000, [&]() {
                         show_pivot_point_ = false;
                         update();
                     });
@@ -299,9 +306,7 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
                 if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
                     camera()->interpolateToFitScene();
             }
-        }
-
-        if (e->modifiers() == Qt::AltModifier) {
+        } else if (e->modifiers() == Qt::AltModifier) {
             bool found = false;
             const vec3 p = pointUnderPixel(e->pos(), found);
             if (found && (walkThrough()->status() == easy3d::WalkThrough::WALKING_MODE) &&
@@ -310,13 +315,28 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
                 walkThrough()->walk_to(p);
             }
             else if (walkThrough()->status() == easy3d::WalkThrough::FREE_MODE) {
-                LOG(WARNING) << "Alt + Left click is for the walking mode only. Use Ctrl + C instead";
+                LOG(WARNING) << "Alt + Left click is for the walking mode only. Press 'K' to add a keyframe in the free mode";
             }
+        } else if (e->modifiers() == Qt::NoModifier && e->button() == Qt::LeftButton &&
+                   walkThrough()->status() == easy3d::WalkThrough::STOPPED && allow_select_model_)
+        {
+            if (!model_picker_)
+                model_picker_ = new ModelPicker(camera());
+            makeCurrent();
+            auto model = model_picker_->pick(models(), e->pos().x(), e->pos().y());
+            doneCurrent();
+            if (model) {
+                setCurrentModel(model);
+                window_->updateUi();
+            }
+            // select the picked model (if picked) and deselect others
+            for (auto m : models_)
+                m->renderer()->set_selected(m == model);
+            update();
         }
     }
 
     QOpenGLWidget::mousePressEvent(e);
-    update();
 }
 
 
@@ -347,8 +367,8 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
                 }
             }
             mesh->collect_garbage();
-            mesh->renderer()->update();
-            LOG(INFO) << count << " faces deleted" << std::endl;
+            mesh->renderer()->update(false);   // do not recompute the bounding box
+            LOG(INFO) << count << " faces deleted";
         } else if (dynamic_cast<PointCloud*>(currentModel())) {
             auto cloud = dynamic_cast<PointCloud*>(currentModel());
             auto select = cloud->vertex_property<bool>("v:select");
@@ -360,11 +380,12 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
                 }
             }
             cloud->collect_garbage();
-            cloud->renderer()->update();
-            LOG(INFO) << count << " points deleted" << std::endl;
+            cloud->renderer()->update(false);   // do not recompute the bounding box
+            LOG(INFO) << count << " points deleted";
         }
         window_->updateUi();
 #endif
+        update();
     }
     else if (pressed_button_ == Qt::LeftButton && e->modifiers() == Qt::ControlModifier) { // ZOOM_ON_REGION
         int xmin = std::min(mouse_pressed_pos_.x(), e->pos().x());
@@ -381,7 +402,6 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
     mouse_current_pos_ = e->pos();
 
     QOpenGLWidget::mouseReleaseEvent(e);
-    update();
 }
 
 
@@ -404,6 +424,7 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
         makeCurrent();
         tool_manager()->drag(bt, e->pos().x(), e->pos().y());
         doneCurrent();
+        update();
     }
     else {
         // control modifier is reserved for zooming on region
@@ -411,17 +432,24 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
             ManipulatedFrame *frame = camera()->frame();
             if (e->modifiers() == Qt::AltModifier) {
                 if (setting::clipping_plane && setting::clipping_plane->is_enabled())
-                    frame = setting::clipping_plane->manipulated_frame();
+                    frame = setting::clipping_plane->manipulator()->frame();
+                else if (currentModel() && currentModel()->renderer()->is_selected()) {
+                    frame = currentModel()->manipulator()->frame();
+                }
             }
 
             int x = e->pos().x();
             int y = e->pos().y();
             int dx = x - mouse_current_pos_.x();
             int dy = y - mouse_current_pos_.y();
+            auto axis = ManipulatedFrame::NONE;
+            if (pressed_key_ == Qt::Key_X) axis = ManipulatedFrame::HORIZONTAL;
+            else if (pressed_key_ == Qt::Key_Y) axis = ManipulatedFrame::VERTICAL;
+            else if (pressed_key_ == Qt::Key_O) axis = ManipulatedFrame::ORTHOGONAL;
             if (pressed_button_ == Qt::LeftButton)
-                frame->action_rotate(x, y, dx, dy, camera_, pressed_key_ == Qt::Key_X);
+                frame->action_rotate(x, y, dx, dy, camera_, axis);
             else if (pressed_button_ == Qt::RightButton)
-                frame->action_translate(x, y, dx, dy, camera_, pressed_key_ == Qt::Key_X);
+                frame->action_translate(x, y, dx, dy, camera_, axis);
             else if (pressed_button_ == Qt::MidButton) {
                 if (dy != 0 && frame == camera_->frame()) // zoom is intended for camera manipulation only
                     frame->action_zoom(dy > 0 ? 1 : -1, camera_);
@@ -429,19 +457,18 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
         }
     }
 
-    mouse_current_pos_ = e->pos();
-    QOpenGLWidget::mouseMoveEvent(e);
-
     if (show_labels_under_mouse_) {
         auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
         if (mesh) {
+            if (!surface_mesh_picker_)
+                surface_mesh_picker_ = new SurfaceMeshPicker(camera());
             makeCurrent();
-            SurfaceMeshPicker picker(camera());
-            picked_face_index_ = picker.pick_face(mesh, mouse_current_pos_.x(), mouse_current_pos_.y()).idx();
+            picked_face_index_ = surface_mesh_picker_->pick_face(mesh, e->pos().x(), e->pos().y()).idx();
             doneCurrent();
         }
         else
             picked_face_index_ = -1;
+        update();
     }
 
     if (show_coordinates_under_mouse_) {
@@ -453,7 +480,8 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
         window_->setPointUnderMouse(coords);
     }
 
-    update();
+    mouse_current_pos_ = e->pos();
+    QOpenGLWidget::mouseMoveEvent(e);
 }
 
 
@@ -466,7 +494,11 @@ void PaintCanvas::mouseDoubleClickEvent(QMouseEvent *e) {
 
 
 void PaintCanvas::wheelEvent(QWheelEvent *e) {
+    if (walkThrough()->interpolator()->is_interpolation_started())
+        return;
+
     if (tool_manager()->current_tool()) {
+        update();
     }
     else {
         const int delta = e->delta();
@@ -477,7 +509,6 @@ void PaintCanvas::wheelEvent(QWheelEvent *e) {
     }
 
     QOpenGLWidget::wheelEvent(e);
-    update();
 }
 
 
@@ -535,9 +566,18 @@ void PaintCanvas::keyPressEvent(QKeyEvent *e) {
     } else if (e->key() == Qt::Key_C && e->modifiers() == Qt::NoModifier) {
         if (currentModel())
             fitScreen(currentModel());
-    } else if (e->key() == Qt::Key_F && e->modifiers() == Qt::NoModifier) {
-        fitScreen();
-    } else if (e->key() == Qt::Key_Space && e->modifiers() == Qt::NoModifier) {
+    }
+
+    else if (e->key() == Qt::Key_K && e->modifiers() == Qt::NoModifier) {
+        if (walkThrough()->status() == easy3d::WalkThrough::FREE_MODE) {
+            const vec3 pos = camera()->position();
+            const quat q = camera()->orientation();
+            walkThrough()->add_keyframe(Frame(camera()->position(), q));
+        }
+        else if (walkThrough()->status() == easy3d::WalkThrough::WALKING_MODE)
+            LOG(WARNING) << "'K' is for the free mode only. Use Alt + Left click to add a keyframe in the walking mode";
+    }
+    else if (e->key() == Qt::Key_Space && e->modifiers() == Qt::NoModifier) {
         // Aligns camera
         Frame frame;
         frame.setTranslation(camera_->pivotPoint());
@@ -732,17 +772,20 @@ void PaintCanvas::closeEvent(QCloseEvent *e) {
 std::string PaintCanvas::usage() const {
     return std::string(
             " ------------------------------------------------------------------\n"
-            " Easy3D viewer usage:                                              \n"
+            " Mapple usage:                                              \n"
             " ------------------------------------------------------------------\n"
             "  F1:                  Help                                        \n"
             " ------------------------------------------------------------------\n"
             "  Fn + Delete:         Delete current model                        \n"
             "  '<' or '>':          Switch between models                       \n"
             " ------------------------------------------------------------------\n"
-            "  Left mouse:          Orbit-rotate the camera                     \n"
-            "  Right mouse:         Pan-move the camera                         \n"
-            "  'x' + Left mouse:    Orbit-rotate the camera (screen based)      \n"
-            "  'x' + Right mouse:   Pan-move camera vertically or horizontally  \n"
+            "  Left drag:           Rotate the camera                           \n"
+            "  Right drag:          Move the camera                             \n"
+            "  'x' + Left drag:     Rotate the camera around horizontal axis    \n"
+            "  'x' + Right drag:    Move the camera along horizontal axis       \n"
+            "  'y' + Left drag:     Rotate the camera around vertical axis      \n"
+            "  'y' + Right drag:    Move the camera along vertical axis         \n"
+            "  'o' + Left drag:     Rotate the camera around ortho-screen axis  \n"
             "  Middle or Wheel:     Zoom in/out                                 \n"
             "  Ctrl + '+'/'-':      Zoom in/out                                 \n"
             "  Left/Right           Turn camera left/right                      \n"
@@ -752,11 +795,11 @@ std::string PaintCanvas::usage() const {
             " ------------------------------------------------------------------\n"
             "  'f':                 Fit screen (all models)                     \n"
             "  'c':                 Fit screen (current model only)             \n"
-            "  'z' + Left mouse:    Zoom to target point on model               \n"
-            "  'z' + Right mouse:   Zoom o fit screen                           \n"
-            "  Shift + Left mouse:  Define a target point on model              \n"
-            "  Shift + Right mouse: Undefine the target point (if any) on model \n"
-            "  Ctrl + Left mouse:   Zoom to fit region                          \n"
+            "  'z' + Left click:    Zoom to target point on model               \n"
+            "  'z' + Right click:   Zoom o fit screen                           \n"
+            "  Shift + Left click:  Define a target point on model              \n"
+            "  Shift + Right click: Undefine the target point (if any) on model \n"
+            "  Ctrl + Left drag:    Zoom to fit region                          \n"
             " ------------------------------------------------------------------\n"
             "  '-'/'=':             Decrease/Increase point size                \n"
             "  '{'/'}':             Decrease/Increase line width                \n"
@@ -789,9 +832,13 @@ void PaintCanvas::addModel(Model *model) {
 
     auto renderer = new Renderer(model);
     model->set_renderer(renderer);
+    auto manipulator = new Manipulator(model);
+    model->set_manipulator(manipulator);
+    // connect the manipulator's signal to the viewer's update function to automatically update rendering.
+    model->manipulator()->frame()->modified.connect(this, static_cast<void (PaintCanvas::*)(void)>(&PaintCanvas::update));
 
     models_.push_back(model);
-//    model_idx_ = static_cast<int>(models_.size()) - 1; // make the last one current
+    model_idx_ = static_cast<int>(models_.size()) - 1; // make the last one current
 }
 
 
@@ -818,33 +865,28 @@ void PaintCanvas::fitScreen(const easy3d::Model *model) {
     if (!model && models_.empty())
         return;
 
-    auto visual_box = [](const Model *m) -> Box3 {
-        Box3 box = m->bounding_box();
-        for (auto d : m->renderer()->points_drawables()) box.add_box(d->bounding_box());
-        for (auto d : m->renderer()->lines_drawables()) box.add_box(d->bounding_box());
-        for (auto d : m->renderer()->triangles_drawables()) box.add_box(d->bounding_box());
-        return box;
-    };
-
     Box3 box;
     if (model)
-        box = visual_box(model);
+        box = model->bounding_box(true);
     else {
         for (auto m : models_)
-            box.add_box(visual_box(m));
+            box.add_box(m->bounding_box(true));
     }
 
     if (box.is_valid()) {
-        camera_->setSceneBoundingBox(box.min(), box.max());
+        camera_->setSceneBoundingBox(box.min_point(), box.max_point());
         camera_->showEntireScene();
         update();
     }
 }
 
 
-vec3 PaintCanvas::pointUnderPixel(const QPoint &p, bool &found) const {
-    const_cast<PaintCanvas *>(this)->makeCurrent();
+void PaintCanvas::fitScreen() {
+    fitScreen(nullptr);
+}
 
+
+vec3 PaintCanvas::pointUnderPixel(const QPoint &p, bool &found) const {
     // Qt (same as GLFW) uses upper corner for its origin while GL uses the lower corner.
     int glx = p.x();
     int gly = height() - 1 - p.y();
@@ -853,6 +895,8 @@ vec3 PaintCanvas::pointUnderPixel(const QPoint &p, bool &found) const {
     //       So we have to handle highdpi desplays.
     glx = static_cast<int>(glx * dpi_scaling());
     gly = static_cast<int>(gly * dpi_scaling());
+
+    const_cast<PaintCanvas *>(this)->makeCurrent();
 
     int samples = 0;
     func_->glGetIntegerv(GL_SAMPLES, &samples);
@@ -987,6 +1031,8 @@ void PaintCanvas::drawCornerAxes() {
 
     program->bind();
     program->set_uniform("MVP", MVP)
+            ->set_uniform("MANIP", mat4::identity())
+            ->set_uniform("NORMAL", mat3::identity())   // needs be padded when using uniform blocks
             ->set_uniform("lighting", true)
             ->set_uniform("two_sides_lighting", false)
             ->set_uniform("smooth_shading", true)
@@ -1000,7 +1046,8 @@ void PaintCanvas::drawCornerAxes() {
             ->set_block_uniform("Material", "shininess", &setting::material_shininess)
             ->set_uniform("hightlight_id_min", -1)
             ->set_uniform("hightlight_id_max", -1)
-            ->set_uniform("clippingPlaneEnabled", false); easy3d_debug_log_gl_error;
+            ->set_uniform("clippingPlaneEnabled", false)
+            ->set_uniform("selected", false);  easy3d_debug_log_gl_error;
 
     drawable_axes_->gl_draw(false); easy3d_debug_log_gl_error;
     program->release();
@@ -1024,20 +1071,22 @@ void PaintCanvas::drawFaceAndVertexLabels(const QColor& face_color, const QColor
     painter.setRenderHint(QPainter::TextAntialiasing);
     painter.beginNativePainting();
 
+    mat4 manip = mesh->manipulator()->matrix();
+
     // draw labels for the vertices of the picked face
     vec3 face_center(0, 0, 0);
     int valence = 0;
     for (auto v : mesh->vertices(SurfaceMesh::Face(picked_face_index_))) {
         const auto& p = mesh->position(v);
         face_center += p;
-        const vec3 proj = camera()->projectedCoordinatesOf(p);
+        const vec3 proj = camera()->projectedCoordinatesOf(manip * p);
         painter.setPen(vertex_color);
         painter.drawText(proj.x, proj.y, QString::fromStdString("v" + std::to_string(v.idx())));
         ++valence;
     }
 
     // draw label for the picked face
-    const vec3 proj = camera()->projectedCoordinatesOf(face_center/valence);
+    const vec3 proj = camera()->projectedCoordinatesOf(manip * (face_center/valence));
     painter.setPen(face_color);
     painter.drawText(proj.x, proj.y, QString::fromStdString("f" + std::to_string(picked_face_index_)));
     easy3d_debug_log_gl_error;
@@ -1097,7 +1146,7 @@ void PaintCanvas::postDraw() {
     }
 
     // shown only when it is not animating
-    if (walk_through_ && walk_through_->is_path_visible() && !walk_through_->interpolator()->is_interpolation_started())
+    if (walk_through_ && !walk_through_->interpolator()->is_interpolation_started())
         walk_through_->draw();
     easy3d_debug_log_gl_error;
 
@@ -1241,6 +1290,11 @@ void PaintCanvas::enableEyeDomeLighting(bool b) {
 }
 
 
+void PaintCanvas::enableSelectModel(bool b) {
+    allow_select_model_ = b;
+}
+
+
 void PaintCanvas::invertSelection() {
     LOG(WARNING) << "planned to be implemented in a future release";
 }
@@ -1263,22 +1317,15 @@ void PaintCanvas::setPerspective(bool b) {
 void PaintCanvas::copyCamera() {
     const vec3 pos = camera()->position();
     const quat q = camera()->orientation();
-    if (walkThrough()->status() == easy3d::WalkThrough::FREE_MODE) {
-        walkThrough()->add_keyframe(Frame(camera()->position(), q));
-    }
-    else if (walkThrough()->status() == easy3d::WalkThrough::STOPPED) {
-        const QString cam_str = QString("%1 %2 %3 %4 %5 %6 %7")
-                .arg(pos[0])
-                .arg(pos[1])
-                .arg(pos[2])
-                .arg(q[0])
-                .arg(q[1])
-                .arg(q[2])
-                .arg(q[3]);
-        qApp->clipboard()->setText(cam_str);
-    }
-    else if (walkThrough()->status() == easy3d::WalkThrough::WALKING_MODE)
-        LOG(WARNING) << "Ctrl + C is for the free mode only. Use Alt + Left click instead";
+    const QString cam_str = QString("%1 %2 %3 %4 %5 %6 %7")
+            .arg(pos[0])
+            .arg(pos[1])
+            .arg(pos[2])
+            .arg(q[0])
+            .arg(q[1])
+            .arg(q[2])
+            .arg(q[3]);
+    qApp->clipboard()->setText(cam_str);
 }
 
 
@@ -1334,7 +1381,7 @@ void PaintCanvas::saveState(std::ostream& output) const {
         return;
 
     // first line is just a comment
-    output << "<Mapple Viewer State> - Saved on " << string::from_current_time() << std::endl << std::endl;
+    output << "<Mapple Viewer State> - Saved on " << string::date_time() << std::endl << std::endl;
 
     //-----------------------------------------------------
 
@@ -1342,12 +1389,6 @@ void PaintCanvas::saveState(std::ostream& output) const {
     output << "<color>" << std::endl;
     output << "\t backGroundColor: " << backGroundColor() << std::endl;
     output << "</color>" << std::endl << std::endl;
-
-    //-----------------------------------------------------
-
-    output << "<display>" << std::endl;
-    output << "\t cameraPathIsDrawn: " << walk_through_->is_path_visible() << std::endl;
-    output << "</display>" << std::endl << std::endl;
 
     //-----------------------------------------------------
 
@@ -1410,14 +1451,6 @@ void PaintCanvas::restoreState(std::istream& input) {
 
     //-----------------------------------------------------
 
-    bool status = false;
-    input >> dummy;	// this skips the keyword
-    input >> dummy >> status;
-    walk_through_->set_path_visible(status);
-    input >> dummy;	// this skips the keyword
-
-    //-----------------------------------------------------
-
     input >> dummy;	// this skips the keyword
     int state = -1;
     input >> dummy >> state;
@@ -1435,7 +1468,7 @@ void PaintCanvas::restoreState(std::istream& input) {
     input >> dummy;	// this skips the keyword
 
     // temporarily don't allow updating rendering when the camera parameters are changing.
-    easy3d::disconnect(&camera_->frame_modified, this);
+    easy3d::disconnect_all(&camera_->frame_modified);
 
     std::string t;
     input >> dummy >> t;
@@ -1460,6 +1493,7 @@ void PaintCanvas::restoreState(std::istream& input) {
     input >> dummy >> v;	camera()->frame()->setRotationSensitivity(v);
     input >> dummy >> v;	camera()->frame()->setZoomSensitivity(v);
     input >> dummy >> v;	camera()->frame()->setTranslationSensitivity(v);
+    bool status = false;
     input >> dummy >> status;	camera()->frame()->setZoomsOnPivotPoint(status);
     input >> dummy >> p;	camera()->frame()->setPivotPoint(p);
     input >> dummy;	// this skips the keyword

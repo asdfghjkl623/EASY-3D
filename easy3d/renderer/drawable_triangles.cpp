@@ -29,6 +29,9 @@
 #include <easy3d/renderer/setting.h>
 #include <easy3d/renderer/texture_manager.h>
 #include <easy3d/renderer/clipping_plane.h>
+#include <easy3d/renderer/manipulator.h>
+#include <easy3d/renderer/transform.h>
+#include <easy3d/core/model.h>
 #include <easy3d/util/logging.h>
 
 
@@ -64,7 +67,7 @@ namespace easy3d {
 
     void TrianglesDrawable::_draw_triangles(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
 
@@ -88,24 +91,32 @@ namespace easy3d {
         const mat4 &MV = camera->modelViewMatrix();
         const vec4 &wLightPos = inverse(MV) * setting::light_position;
 
+        // transformation introduced by manipulation
+        const mat4 MANIP = manipulated_matrix();
+        // needs be padded when using uniform blocks
+        const mat3 NORMAL = transform::normal_matrix(MANIP);
+
         program->bind();
         program->set_uniform("MVP", MVP)
-                ->set_uniform("lighting",lighting())
+                ->set_uniform("MANIP", MANIP)
+                ->set_uniform( "NORMAL", NORMAL)
+                ->set_uniform("lighting", lighting())
                 ->set_uniform("wLightPos", wLightPos)
                 ->set_uniform("wCamPos", wCamPos)
-                ->set_uniform("two_sides_lighting",lighting_two_sides())
-                ->set_uniform("distinct_back_color",distinct_back_color())
-                ->set_uniform("backside_color",back_color())
+                ->set_uniform("two_sides_lighting", lighting_two_sides())
+                ->set_uniform("distinct_back_color", distinct_back_color())
+                ->set_uniform("backside_color", back_color())
                 ->set_uniform("smooth_shading", smooth_shading())
                 ->set_uniform("ssaoEnabled", is_ssao_enabled())
-                ->set_uniform("per_vertex_color",coloring_method() != State::UNIFORM_COLOR && color_buffer())
-                ->set_uniform("default_color",color())
-                ->set_block_uniform("Material", "ambient",material().ambient)
-                ->set_block_uniform("Material", "specular",material().specular)
+                ->set_uniform("per_vertex_color", coloring_method() != State::UNIFORM_COLOR && color_buffer())
+                ->set_uniform("default_color", color())
+                ->set_block_uniform("Material", "ambient", material().ambient)
+                ->set_block_uniform("Material", "specular", material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess)
-                ->set_uniform("highlight",highlight())
-                ->set_uniform("hightlight_id_min",highlight_range().first)
-                ->set_uniform("hightlight_id_max",highlight_range().second);
+                ->set_uniform("highlight", highlight())
+                ->set_uniform("hightlight_id_min", highlight_range().first)
+                ->set_uniform("hightlight_id_max", highlight_range().second)
+                ->set_uniform("selected", is_selected());
 
         if (setting::clipping_plane)
             setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
@@ -122,11 +133,11 @@ namespace easy3d {
 
     void TrianglesDrawable::_draw_triangles_with_texture(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
         if (texcoord_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "texcoord buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "texcoord buffer not created. " << COUNTER;
             return;
         }
 
@@ -150,29 +161,42 @@ namespace easy3d {
         const mat4 &MV = camera->modelViewMatrix();
         const vec4 &wLightPos = inverse(MV) * setting::light_position;
 
+        // transformation introduced by manipulation
+        const mat4 MANIP = manipulated_matrix();
+        // needs be padded when using uniform blocks
+        const mat3 NORMAL = transform::normal_matrix(MANIP);
+
         program->bind();
         program->set_uniform("MVP", MVP)
-                ->set_uniform("lighting",lighting())
+                ->set_uniform("MANIP", MANIP)
+                ->set_uniform( "NORMAL", NORMAL)
+                ->set_uniform("lighting", lighting())
                 ->set_uniform("wLightPos", wLightPos)
                 ->set_uniform("wCamPos", wCamPos)
-                ->set_uniform("two_sides_lighting",lighting_two_sides())
-                ->set_uniform("distinct_back_color",distinct_back_color())
-                ->set_uniform("backside_color",back_color())
+                ->set_uniform("two_sides_lighting", lighting_two_sides())
+                ->set_uniform("distinct_back_color", distinct_back_color())
+                ->set_uniform("backside_color", back_color())
                 ->set_uniform("smooth_shading", smooth_shading())
-                ->set_block_uniform("Material", "ambient",material().ambient)
-                ->set_block_uniform("Material", "specular",material().specular)
+                ->set_uniform("ssaoEnabled", is_ssao_enabled())
+                ->set_block_uniform("Material", "ambient", material().ambient)
+                ->set_block_uniform("Material", "specular", material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess)
-                ->bind_texture("textureID",texture()->id(), 0)
-                ->set_uniform("texture_repeat",texture_repeat())
-                ->set_uniform("fractional_repeat",texture_fractional_repeat())
-                ->set_uniform("highlight",highlight())
-                ->set_uniform("hightlight_id_min",highlight_range().first)
-                ->set_uniform("hightlight_id_max",highlight_range().second);
+                ->bind_texture("textureID", texture()->id(), 0)
+                ->set_uniform("texture_repeat", texture_repeat())
+                ->set_uniform("fractional_repeat", texture_fractional_repeat())
+                ->set_uniform("highlight", highlight())
+                ->set_uniform("hightlight_id_min", highlight_range().first)
+                ->set_uniform("hightlight_id_max", highlight_range().second)
+                ->set_uniform("selected", is_selected());
 
         if (setting::clipping_plane)
             setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
 
+        if (is_ssao_enabled())
+            program->bind_texture("ssaoTexture", ssao_texture_, 1);
         gl_draw(with_storage_buffer);
+        if (is_ssao_enabled())
+            program->release_texture();
 
         program->release_texture();
         program->release();

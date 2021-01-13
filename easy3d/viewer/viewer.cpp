@@ -42,6 +42,7 @@
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/poly_mesh.h>
 #include <easy3d/renderer/renderer.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/renderer/drawable_points.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_triangles.h>
@@ -534,8 +535,7 @@ namespace easy3d {
                     camera_->setPivotPoint(p);
                     // show, but hide the visual hint of pivot point after \p delay milliseconds.
                     show_pivot_point_ = true;
-                    const int delay = 10000;
-                    Timer::single_shot(delay, [&]() {
+                    Timer<>::single_shot(10000, [&]() {
                         show_pivot_point_ = false;
                         update();
                     });
@@ -590,12 +590,16 @@ namespace easy3d {
     bool Viewer::mouse_drag_event(int x, int y, int dx, int dy, int button, int modifiers) {
         // control modifier is reserved for zooming on region
         if (modifiers != EASY3D_MOD_CONTROL) {
+            auto axis = ManipulatedFrame::NONE;
+            if (pressed_key_ == GLFW_KEY_X) axis = ManipulatedFrame::HORIZONTAL;
+            else if (pressed_key_ == GLFW_KEY_Y) axis = ManipulatedFrame::VERTICAL;
+            else if (pressed_key_ == GLFW_KEY_O) axis = ManipulatedFrame::ORTHOGONAL;
             switch (button) {
                 case GLFW_MOUSE_BUTTON_LEFT:
-                    camera_->frame()->action_rotate(x, y, dx, dy, camera_, pressed_key_ == GLFW_KEY_X);
+                    camera_->frame()->action_rotate(x, y, dx, dy, camera_, axis);
                     break;
                 case GLFW_MOUSE_BUTTON_RIGHT:
-                    camera_->frame()->action_translate(x, y, dx, dy, camera_, pressed_key_ == GLFW_KEY_X);
+                    camera_->frame()->action_translate(x, y, dx, dy, camera_, axis);
                     break;
                 case GLFW_MOUSE_BUTTON_MIDDLE:
                     if (std::abs(dy) >= 1)
@@ -728,7 +732,7 @@ namespace easy3d {
             Box3 box;
             for (auto m : models_)
                 box.add_box(m->bounding_box());
-            camera_->setSceneBoundingBox(box.min(), box.max());
+            camera_->setSceneBoundingBox(box.min_point(), box.max_point());
             LOG(INFO) << "camera path deleted";
         } else if (key == GLFW_KEY_K && modifiers == EASY3D_MOD_CONTROL) { // play the path
             if (kfi_->is_interpolation_started())
@@ -751,7 +755,7 @@ namespace easy3d {
                 Box3 box;
                 for (auto m : models_)
                     box.add_box(m->bounding_box());
-                camera_->setSceneBoundingBox(box.min(), box.max());
+                camera_->setSceneBoundingBox(box.min_point(), box.max_point());
             }
         } else if (key == GLFW_KEY_LEFT_BRACKET && modifiers == 0) {
             for (auto m : models_) {
@@ -1026,15 +1030,18 @@ namespace easy3d {
                 " ------------------------------------------------------------------\n"
                 "  Ctrl + 'o':          Open file                                   \n"
                 "  Ctrl + 's':          Save file                                   \n"
-                "  Delete:              Delete current model                        \n"
+                "  Fn + Delete:         Delete current model                        \n"
                 "  '<' or '>':          Switch between models                       \n"
                 "  's':                 Snapshot                                    \n"
                 " ------------------------------------------------------------------\n"
                 "  'p':                 Toggle perspective/orthographic projection) \n"
-                "  Left mouse:          Orbit-rotate the camera                     \n"
-                "  Right mouse:         Pan-move the camera                         \n"
-                "  'x' + Left mouse:    Orbit-rotate the camera (screen based)      \n"
-                "  'x' + Right mouse:   Pan-move camera vertically or horizontally  \n"
+                "  Left drag:           Rotate the camera                           \n"
+                "  Right drag:          Move the camera                             \n"
+                "  'x' + Left drag:     Rotate the camera around horizontal axis    \n"
+                "  'x' + Right drag:    Move the camera along horizontal axis       \n"
+                "  'y' + Left drag:     Rotate the camera around vertical axis      \n"
+                "  'y' + Right drag:    Move the camera along vertical axis         \n"
+                "  'o' + Left drag:     Rotate the camera around ortho-screen axis  \n"
                 "  Middle or Wheel:     Zoom in/out                                 \n"
                 "  Ctrl + '+'/'-':      Zoom in/out                                 \n"
                 "  Left/Right           Turn camera left/right                      \n"
@@ -1044,11 +1051,11 @@ namespace easy3d {
                 " ------------------------------------------------------------------\n"
                 "  'f':                 Fit screen (all models)                     \n"
                 "  'c':                 Fit screen (current model only)             \n"
-                "  'z' + Left mouse:    Zoom to target point on model               \n"
-                "  'z' + Right mouse:   Zoom o fit screen                           \n"
-                "  Shift + Left mouse:  Define a target point on model              \n"
-                "  Shift + Right mouse: Undefine the target point (if any) on model \n"
-                "  Ctrl + Left mouse:   Zoom to fit region                          \n"
+                "  'z' + Left click:    Zoom to target point on model               \n"
+                "  'z' + Right click:   Zoom o fit screen                           \n"
+                "  Shift + Left click:  Define a target point on model              \n"
+                "  Shift + Right click: Undefine the target point (if any) on model \n"
+                "  Ctrl + Left drag:    Zoom to fit region                          \n"
                 " ------------------------------------------------------------------\n"
                 "  '-'/'=':             Decrease/Increase point size                \n"
                 "  '{'/'}':             Decrease/Increase line width                \n"
@@ -1120,6 +1127,8 @@ namespace easy3d {
 
         auto renderer = new Renderer(model, create);
         model->set_renderer(renderer);
+        auto manipulator = new Manipulator(model);
+        model->set_manipulator(manipulator);
 
         int pre_idx = model_idx_;
         models_.push_back(model);
@@ -1220,7 +1229,7 @@ namespace easy3d {
         }
 
         if (box.is_valid()) {
-            camera_->setSceneBoundingBox(box.min(), box.max());
+            camera_->setSceneBoundingBox(box.min_point(), box.max_point());
             camera_->showEntireScene();
             update();
         }

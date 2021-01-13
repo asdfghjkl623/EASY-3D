@@ -26,12 +26,6 @@
 
 #include <algorithm>
 
-#ifdef WIN32
-#define NOMINMAX
-#undef min
-#undef max
-#endif
-
 #include <easy3d/core/surface_mesh.h>
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/util/file_system.h>
@@ -59,8 +53,8 @@ namespace easy3d {
 
 #define REAL    float
 
-#define DEGREE            2
-#define DATA_DEGREE        1        // The order of the B-Spline used to splat in data for color interpolation
+#define DEGREE           2
+#define DATA_DEGREE      1        // The order of the B-Spline used to splat in data for color interpolation
 #define WEIGHT_DEGREE    2        // The order of the B-Spline used to splat in the weights for density estimation
 #define NORMAL_DEGREE    2        // The order of the B-Spline used to splat int the normals for constructing the Laplacian constraints
 
@@ -207,7 +201,7 @@ namespace easy3d {
 
         PointCloud::VertexProperty<vec3> normals = cloud->get_vertex_property<vec3>("v:normal");
         if (!normals) {
-            LOG(ERROR) << "normals are required";
+            LOG(ERROR) << "normal information not exist for Poisson surface reconstruction method";
             return nullptr;
         }
 
@@ -265,7 +259,7 @@ namespace easy3d {
             {
                 const Box3 &box = cloud->bounding_box();
 
-                Point3D<REAL> min_p(box.min(0), box.min(1), box.min(2)), max_p(box.max(0), box.max(1), box.max(2));
+                Point3D<REAL> min_p(box.min_coord(0), box.min_coord(1), box.min_coord(2)), max_p(box.max_coord(0), box.max_coord(1), box.max_coord(2));
                 Point3D<REAL> center = (max_p + min_p) / 2;
                 REAL scale = std::max<REAL>(max_p[0] - min_p[0],
                                             std::max<REAL>(max_p[1] - min_p[1], max_p[2] - min_p[2]));

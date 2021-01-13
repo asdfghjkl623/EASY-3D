@@ -26,68 +26,66 @@
 #define EASY3D_UTIL_LOGGING_H
 
 
-/* Make it easier for including the Google glog header file.
- *
- * Always include this file, i.e.,
- *      #include <easy3d/util/logging.h>
- * instead of including any other header files, because the third parties may change.
- */
-
-#include <3rd_party/glog/glog/logging.h>
-#include <3rd_party/glog/glog/stl_logging.h>    // to allow logging STL containers
+#include <easy3d/util/easylogging++.h>
 
 
-/** If failed, a fatal error will be logged */
-#define CHECK_TRUE(val)     CHECK_EQ((val), true)
-#define CHECK_FALSE(val)    CHECK_EQ((val), false)
-
-namespace easy3d
-{
+namespace easy3d {
 
     /// \brief The logging mechanism.
     /// \namespace easy3d::logging
-	namespace logging
-	{
+    namespace logging {
 
-		/**
-		 * @brief Initializes Google's logging library. The log will be writen to log files.
-		 * @param severity_dependent True to create a log file for each severity, otherwise a single log file each run.
-		 * @param log_dir The directory where the log files will be created. If it is empty (default value), the log
-		 * 		  files will be created in the "logs" directory next the executable file.
-		 * @param stderr_threshold Log messages at a level >= this flag are automatically sent to standard error
-		 *        (stderr) in addition to log files. Acceptable values are
-		 *          - google::GLOG_INFO
-		 *          - google::GLOG_WARNING
-		 *          - google::GLOG_ERROR
-		 * @note Initialization of Google's logging library is not mandatory. Logging before initialize() will be
-		 * 		 written to stderr.
-		 */
-		void initialize(bool severity_dependent = false, const std::string& log_dir = "", int stderr_threshold = google::GLOG_WARNING);
+        /**
+         * @brief Initializes the logging module.
+         * @param verbose \c ture to log messages at a the INFO level to stderr.
+         *      \c false only log at WARNING, ERROR, FATAL levels.
+         * @param log_file A string specifying the full path to the log file.
+         *      If valid, the log messages will be written to this file in addition to logging to stderr.
+         *      No log file will be created if \p log_file is empty.
+         *      Passing "default" allows to creat a log file with a title "ApplicationName.log" in a
+         *      directory "logs" next to the executable file.
+         * @note This initialization is optional. If not called, log messages will be written to stderr only.
+         */
+        void initialize(bool verbose = false, const std::string &log_file = "default");
 
 
-        // Base class for a log client.
-        // Users should subclass LogClient and override output to do whatever they want.
-        class LogClient : public google::LogSink {
+        /// Base class for a logger, i.e., to log messages to whatever
+        /// Users should subclass Logger and override send() to do whatever they want.
+        /// \class Logger easy3d/util/logging.h
+        class Logger : public el::LogDispatchCallback {
         public:
-            LogClient();
+            Logger();
 
-            // severity
-            //  0: INFO
-            //  1: WARNING
-            //  2: ERROR
-            //  3: FATAL
-            virtual void send(int severity, const std::string &message) = 0;
+            /// writes the log message \p msg (and may also other given information).
+            virtual void send(el::Level level, const std::string& msg) = 0;
 
-            // This method implements the output of the logger. It internally calls the above output() method.
-            void send(google::LogSeverity severity, const char *full_filename,
-                      const char *base_filename, int line,
-                      const struct ::tm *tm_time,
-                      const char *message, size_t message_len) override;
-
+        protected:
+            void handle(const el::LogDispatchData* data) noexcept override {
+                // remove all trailing ending line breaks
+                std::string msg = data->logMessage()->message();
+                while (msg.back() == '\n' && !msg.empty()) {
+                    msg.erase(msg.end() - 1);
+                }
+                send(data->logMessage()->level(), msg);
+            }
         };
 
     };
 
+
+
+// to have the same syntax as glog
+#define LOG_FIRST_N LOG_N_TIMES
+
+// to have LOG_IF_EVERY_N
+#define LOG_IF_EVERY_N(n, condition, LEVEL)  if (condition) \
+    CLOG_EVERY_N(n, LEVEL, ELPP_CURR_FILE_LOGGER_ID)
+
+// for logging the counter number
+#define COUNTER     ELPP_COUNTER->hitCounts()
+
 }
 
-#endif // EASY3D_UTIL_LOGGING_H
+
+
+#endif  // EASY3D_UTIL_LOGGING_H

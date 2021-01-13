@@ -59,19 +59,19 @@ namespace easy3d {
         const std::string dir = resource::directory() + "/shaders/";
         const std::string vs_file = dir + base_name + ".vert";
         if (!file_system::is_file(vs_file)) {
-            LOG_FIRST_N(ERROR, 1) << "vertex shader file \'" << vs_file + " does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "vertex shader file \'" << vs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
         const std::string fs_file = dir + base_name + ".frag";
         if (!file_system::is_file(fs_file)) {
-            LOG_FIRST_N(ERROR, 1) << "fragment shader file \'" << fs_file + " does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "fragment shader file \'" << fs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
         const std::string gs_file = dir + base_name + ".geom";
         if (geom_shader && !file_system::is_file(gs_file)) {
-            LOG_FIRST_N(ERROR, 1) << "geometry shader file \'" << gs_file + " does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "geometry shader file \'" << gs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
@@ -139,19 +139,19 @@ namespace easy3d {
         const std::string dir = resource::directory() + "/shaders/";
 		const std::string vert_file = dir + vert_file_name;
         if (!file_system::is_file(vert_file)) {
-            LOG_FIRST_N(ERROR, 1) << "vertex shader file \'" << vert_file_name + "\' does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "vertex shader file \'" << vert_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
 		const std::string frag_file = dir + frag_file_name;
         if (!file_system::is_file(frag_file)) {
-            LOG_FIRST_N(ERROR, 1) << "fragment shader file \'" << frag_file_name + "\' does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "fragment shader file \'" << frag_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
 		const std::string geom_file = dir + geom_file_name;
         if (!geom_file_name.empty() && !file_system::is_file(geom_file)) {
-            LOG_FIRST_N(ERROR, 1) << "geometry shader file \'" << geom_file_name + "\' does not exist (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "geometry shader file \'" << geom_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
@@ -161,7 +161,7 @@ namespace easy3d {
 		std::string vert_code;
         file_system::read_file_to_string(vert_file, vert_code);
 		if (!extra_vert_code.empty())
-			string::replace_substring(vert_code, "//INSERT", extra_vert_code);
+			string::replace(vert_code, "//INSERT", extra_vert_code);
         bool success = program->load_shader_from_code(ShaderProgram::VERTEX, vert_code);
         if (!success) {
             delete program;
@@ -171,7 +171,7 @@ namespace easy3d {
 		std::string frag_code;
         file_system::read_file_to_string(frag_file, frag_code);
 		if (!extra_frag_code.empty())
-			string::replace_substring(frag_code, "//INSERT", extra_frag_code);
+			string::replace(frag_code, "//INSERT", extra_frag_code);
         success = program->load_shader_from_code(ShaderProgram::FRAGMENT, frag_code);
         if (!success) {
             delete program;
@@ -182,7 +182,7 @@ namespace easy3d {
 			std::string geom_code;
             file_system::read_file_to_string(geom_file, geom_code);
 			if (!extra_geom_code.empty())
-				string::replace_substring(geom_code, "//INSERT", extra_geom_code);
+				string::replace(geom_code, "//INSERT", extra_geom_code);
             success = program->load_shader_from_code(ShaderProgram::GEOMETRY, geom_code);
             if (!success) {
                 delete program;

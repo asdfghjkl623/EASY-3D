@@ -78,21 +78,26 @@ namespace easy3d {
 
         //-------------------- rendering functionalities  -----------------------
 
+        /// Returns whether the model is currently visible.
         bool is_visible() const { return visible_; }
+        /// Shows/Hides the model.
         void set_visible(bool b) { visible_ = b; }
 
+        /// Returns whether the model has been selected.
         bool is_selected() const { return selected_; }
-        void set_selected(bool b) { selected_ = b; }
+        /// Select/Deselect the model. The state of all its drawables will change accordingly.
+        void set_selected(bool b);
 
         /**
          * @brief Invalidates the rendering buffers of the model and thus updates the rendering (delayed in rendering).
          * @details This method triggers an update of the rendering buffers of all the drawables of the model to which
          *      this renderer is attached. The effect is equivalent to calling Drawable::update() functions for all
          *      the drawables of this model.
+         * @param update_bbox \c true to recompute the bounding box of the model.
          * @Note: To achieve better performance, it is wiser to update only the affected drawables and buffers.
          * \sa  Drawable::update()
          */
-        void update();
+        void update(bool update_bbox = true);
 
         //-------------------- drawable management  -----------------------
 

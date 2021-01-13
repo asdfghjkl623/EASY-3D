@@ -81,7 +81,7 @@ namespace easy3d {
 
     void LinesDrawable::_draw_plain_lines(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
 
@@ -97,10 +97,16 @@ namespace easy3d {
                 return;
 
             const mat4 &MVP = camera->modelViewProjectionMatrix();
+            // transformation introduced by manipulation
+            const mat4 MANIP = manipulated_matrix();
+
             program->bind();
             program->set_uniform("MVP", MVP)
+                    ->set_uniform("MANIP", MANIP)
                     ->set_uniform("per_vertex_color",coloring_method() != State::UNIFORM_COLOR && color_buffer())
                     ->set_uniform("default_color",color());
+
+            program->set_uniform("selected", is_selected());
 
             if (setting::clipping_plane)
                 setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
@@ -123,12 +129,15 @@ namespace easy3d {
             program->set_uniform("perspective", camera->type() == Camera::PERSPECTIVE)
                     ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
                     ->set_uniform("MV", camera->modelViewMatrix())
-                    ->set_uniform("PROJ", camera->projectionMatrix());
+                    ->set_uniform("PROJ", camera->projectionMatrix())
+                    ->set_uniform("MANIP", manipulated_matrix());
 
             float ratio = camera->pixelGLRatio(camera->pivotPoint());
             program->set_uniform("radius", line_width_ * ratio * 0.5f)  // 0.5f from width -> radius
                     ->set_uniform("default_color",color())
                     ->set_uniform("per_vertex_color",coloring_method() != State::UNIFORM_COLOR && color_buffer());
+
+            program->set_uniform("selected", is_selected());
 
             if (setting::clipping_plane)
                 setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
@@ -141,7 +150,7 @@ namespace easy3d {
 
     void LinesDrawable::_draw_cylinders(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
 
@@ -160,7 +169,8 @@ namespace easy3d {
         program->set_uniform("perspective", camera->type() == Camera::PERSPECTIVE)
                 ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
                 ->set_uniform("MV", camera->modelViewMatrix())
-                ->set_uniform("PROJ", camera->projectionMatrix());
+                ->set_uniform("PROJ", camera->projectionMatrix())
+                ->set_uniform("MANIP", manipulated_matrix());
 
         float ratio = camera->pixelGLRatio(camera->pivotPoint());
         program->set_uniform("radius", line_width_ * ratio * 0.5f)  // 0.5f from width -> radius
@@ -173,6 +183,8 @@ namespace easy3d {
                 ->set_block_uniform("Material", "specular",material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess);
 
+        program->set_uniform("selected", is_selected());
+
         if (setting::clipping_plane)
             setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
 
@@ -183,7 +195,7 @@ namespace easy3d {
 
     void LinesDrawable::_draw_cones(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
 
@@ -202,7 +214,8 @@ namespace easy3d {
         program->set_uniform("perspective", camera->type() == Camera::PERSPECTIVE)
                 ->set_uniform("MV", camera->modelViewMatrix())
                 ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
-                ->set_uniform("PROJ", camera->projectionMatrix());
+                ->set_uniform("PROJ", camera->projectionMatrix())
+                ->set_uniform("MANIP", manipulated_matrix());
 
         float ratio = camera->pixelGLRatio(camera->pivotPoint());
         program->set_uniform("radius", line_width() * ratio * 0.5f)  // 0.5f from width -> radius
@@ -214,6 +227,8 @@ namespace easy3d {
                 ->set_block_uniform("Material", "specular", material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess);
 
+        program->set_uniform("selected", is_selected());
+
         if (setting::clipping_plane)
             setting::clipping_plane->set_program(program, plane_clip_discard_primitive());
 
@@ -224,11 +239,11 @@ namespace easy3d {
 
     void LinesDrawable::_draw_plain_lines_with_texture(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
         if (texcoord_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "texcoord buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "texcoord buffer not created. " << COUNTER;
             return;
         }
 
@@ -244,8 +259,14 @@ namespace easy3d {
                 return;
 
             const mat4 &MVP = camera->modelViewProjectionMatrix();
+            // transformation introduced by manipulation
+            const mat4 MANIP = manipulated_matrix();
+
             program->bind();
-            program->set_uniform("MVP", MVP);
+            program->set_uniform("MVP", MVP)
+                    ->set_uniform("MANIP", MANIP);
+
+            program->set_uniform("selected", is_selected());
 
 //      program->set_uniform("highlight",highlight())
 //                ->set_uniform("hightlight_id_min",highlight_range().first)
@@ -273,9 +294,12 @@ namespace easy3d {
             program->bind();
             program->set_uniform("MV", camera->modelViewMatrix())
                     ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
-                    ->set_uniform("PROJ", camera->projectionMatrix());
+                    ->set_uniform("PROJ", camera->projectionMatrix())
+                    ->set_uniform("MANIP", manipulated_matrix());
             float ratio = camera->pixelGLRatio(camera->pivotPoint());
             program->set_uniform("radius", line_width() * ratio * 0.5f);  // 0.5f from width -> radius
+
+            program->set_uniform("selected", is_selected());
 
             //      program->set_uniform("highlight",highlight())
             //                ->set_uniform("hightlight_id_min",highlight_range().first)
@@ -294,11 +318,11 @@ namespace easy3d {
 
     void LinesDrawable::_draw_cylinders_with_texture(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
         if (texcoord_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "texcoord buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "texcoord buffer not created. " << COUNTER;
             return;
         }
 
@@ -317,7 +341,8 @@ namespace easy3d {
         program->set_uniform("perspective", camera->type() == Camera::PERSPECTIVE)
                 ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
                 ->set_uniform("MV", camera->modelViewMatrix())
-                ->set_uniform("PROJ", camera->projectionMatrix());
+                ->set_uniform("PROJ", camera->projectionMatrix())
+                ->set_uniform("MANIP", manipulated_matrix());
 
         float ratio = camera->pixelGLRatio(camera->pivotPoint());
         program->set_uniform("radius", line_width_ * ratio * 0.5f)  // 0.5f from width -> radius
@@ -327,6 +352,8 @@ namespace easy3d {
         program->set_block_uniform("Material", "ambient",material().ambient)
                 ->set_block_uniform("Material", "specular",material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess);
+
+        program->set_uniform("selected", is_selected());
 
 //      program->set_uniform("highlight",highlight())
 //                ->set_uniform("hightlight_id_min",highlight_range().first)
@@ -344,11 +371,11 @@ namespace easy3d {
 
     void LinesDrawable::_draw_cones_with_texture(const Camera *camera, bool with_storage_buffer) const {
         if (vertex_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "drawable \'" << name() << "\': vertex buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "drawable \'" << name() << "\': vertex buffer not created. " << COUNTER;
             return;
         }
         if (texcoord_buffer() == 0) {
-            LOG_FIRST_N(ERROR, 1) << "texcoord buffer not created (this is the first record)";
+            LOG_FIRST_N(1, ERROR) << "texcoord buffer not created. " << COUNTER;
             return;
         }
 
@@ -367,7 +394,8 @@ namespace easy3d {
         program->set_uniform("perspective", camera->type() == Camera::PERSPECTIVE)
                 ->set_uniform("invMV", inverse(camera->modelViewMatrix()))
                 ->set_uniform("MV", camera->modelViewMatrix())
-                ->set_uniform("PROJ", camera->projectionMatrix());
+                ->set_uniform("PROJ", camera->projectionMatrix())
+                ->set_uniform("MANIP", manipulated_matrix());
 
         float ratio = camera->pixelGLRatio(camera->pivotPoint());
         program->set_uniform("radius", line_width_ * ratio * 0.5f)  // 0.5f from width -> radius
@@ -377,6 +405,8 @@ namespace easy3d {
         program->set_block_uniform("Material", "ambient",material().ambient)
                 ->set_block_uniform("Material", "specular",material().specular)
                 ->set_block_uniform("Material", "shininess", &material().shininess);
+
+        program->set_uniform("selected", is_selected());
 
         if (setting::clipping_plane)
             setting::clipping_plane->set_program(program, plane_clip_discard_primitive());

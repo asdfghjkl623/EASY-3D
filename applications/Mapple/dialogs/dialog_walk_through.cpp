@@ -27,12 +27,13 @@
 #include "main_window.h"
 
 #include <easy3d/core/model.h>
-#include <easy3d/renderer/walk_throuth.h>
+#include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/renderer/manipulated_camera_frame.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/util/logging.h>
 #include <easy3d/util/file_system.h>
+#include <easy3d/util/stop_watch.h>
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -57,15 +58,16 @@ DialogWalkThrough::DialogWalkThrough(MainWindow *window)
 
     connect(importCameraPathButton, SIGNAL(clicked()), this, SLOT(importCameraPathFromFile()));
     connect(exportCameraPathButton, SIGNAL(clicked()), this, SLOT(exportCameraPathToFile()));
+
     connect(checkBoxShowCameraPath, SIGNAL(toggled(bool)), this, SLOT(showCameraPath(bool)));
 
     connect(radioButtonWalkingMode, SIGNAL(toggled(bool)), this, SLOT(setWalkingMode(bool)));
 
-	connect(previousPositionButton, SIGNAL(clicked()), this, SLOT(goToPreviousPosition()));
-	connect(nextPositionButton, SIGNAL(clicked()), this, SLOT(goToNextPosition()));
-    connect(removeLastPositionButton, SIGNAL(clicked()), this, SLOT(removeLastPosition()));
+	connect(previousKeyframeButton, SIGNAL(clicked()), this, SLOT(goToPreviousKeyframe()));
+	connect(nextKeyframeButton, SIGNAL(clicked()), this, SLOT(goToNextKeyframe()));
+    connect(removeLastKeyframeButton, SIGNAL(clicked()), this, SLOT(removeLastKeyframe()));
 
-    connect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToPosition(int)));
+    connect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToKeyframe(int)));
 
     connect(clearCameraPathButton, SIGNAL(clicked()), this, SLOT(clearPath()));
     connect(previewButton, SIGNAL(toggled(bool)), this, SLOT(preview(bool)));
@@ -88,7 +90,7 @@ DialogWalkThrough::~DialogWalkThrough()
 
 
 void DialogWalkThrough::numKeyramesChanged() {
-    disconnect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToPosition(int)));
+    disconnect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToKeyframe(int)));
     int num = interpolator()->number_of_keyframes();
     if (num == 1) // range is [0, 0]
         horizontalSliderPreview->setEnabled(false);
@@ -99,7 +101,7 @@ void DialogWalkThrough::numKeyramesChanged() {
     int pos = walkThrough()->current_keyframe_index();
     if (pos >= 0)
         horizontalSliderPreview->setValue(pos);
-    connect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToPosition(int)));
+    connect(horizontalSliderPreview, SIGNAL(valueChanged(int)), this, SLOT(goToKeyframe(int)));
 }
 
 
@@ -159,7 +161,7 @@ void DialogWalkThrough::setCharacterHeightFactor(double h) {
 
 void DialogWalkThrough::setCharacterDistanceFactor(double d) {
     walkThrough()->set_third_person_forward_factor(d);
-    DLOG(WARNING) << "TODO: allow to modify the last keyframe (camera position and orientation) here" << std::endl;
+    DLOG(WARNING) << "TODO: allow to modify the last keyframe (camera position and orientation) here";
     viewer_->update();
 }
 
@@ -189,19 +191,19 @@ void DialogWalkThrough::setWalkingMode(bool b) {
 }
 
 
-void DialogWalkThrough::goToPreviousPosition()
+void DialogWalkThrough::goToPreviousKeyframe()
 {
-    int pos = walkThrough()->current_keyframe_index();
+    const int pos = walkThrough()->current_keyframe_index();
     if (pos <= 0)  // if not started (or at the 1st keyframe), move to the start view point
         walkThrough()->move_to(0);
     else
         walkThrough()->move_to(pos - 1);
     viewer_->update();
-    LOG(INFO) << "moved to position " << walkThrough()->current_keyframe_index();
+    LOG(INFO) << "moved to keyframe " << walkThrough()->current_keyframe_index();
 }
 
 
-void DialogWalkThrough::goToNextPosition()
+void DialogWalkThrough::goToNextKeyframe()
 {
     int pos = walkThrough()->current_keyframe_index();
     if (pos >= interpolator()->number_of_keyframes() - 1)  // if already at the end, move to the last view point
@@ -209,27 +211,27 @@ void DialogWalkThrough::goToNextPosition()
     else
         walkThrough()->move_to(pos + 1);
     viewer_->update();
-    LOG(INFO) << "moved to position " << walkThrough()->current_keyframe_index();
+    LOG(INFO) << "moved to keyframe " << walkThrough()->current_keyframe_index();
 }
 
 
-void DialogWalkThrough::removeLastPosition() {
-    if (interpolator()->number_of_keyframes() == 0) {
-        LOG(INFO) << "no position can be removed (path is empty)";
-    }
+void DialogWalkThrough::removeLastKeyframe() {
+    if (interpolator()->number_of_keyframes() == 0)
+        LOG(WARNING) << "no keyframe can be removed (empty path)";
     else {
-        int pos = walkThrough()->current_keyframe_index();
-        if (pos == interpolator()->number_of_keyframes() - 1)  // currently viewing at the last position
-            pos = walkThrough()->move_to(pos - 1);  // move to the previous position
-        walkThrough()->delete_last_position();
+        walkThrough()->delete_last_keyframe();
+        int index = walkThrough()->current_keyframe_index();
         viewer_->update();
 
-        LOG(INFO) << "last position removed (current position is " << pos << ")";
+        if (index == -1)
+            LOG(WARNING) << "no keyframe can be removed (empty path)";
+        else
+            LOG(INFO) << "last keyframe removed (current keyframe: " << index << ")";
     }
 }
 
 
-void DialogWalkThrough::goToPosition(int p) {
+void DialogWalkThrough::goToKeyframe(int p) {
     walkThrough()->move_to(p, false);
     viewer_->update();
 }
@@ -237,7 +239,7 @@ void DialogWalkThrough::goToPosition(int p) {
 
 void DialogWalkThrough::clearPath() {
     if (interpolator()->number_of_keyframes() == 0 && interpolator()->number_of_keyframes() == 0) {
-        LOG(WARNING) << "nothing to clear (path is empty)";
+        LOG(WARNING) << "nothing to clear (empty path)";
         return;
     }
 
@@ -319,18 +321,20 @@ void DialogWalkThrough::preview(bool b) {
     // this also handles the UI, but a bit complicated (because the Qt GUI actions cannot be triggered in another thread)
     // idea: animation signal -> Qt signals -> Qt action
     auto interpolationStopped = [this]() -> void { emit previewStopped(); };
+    static int id_interpolationStopped = 0;
+    static StopWatch w;
     if (b) {
         if (!interpolator() || interpolator()->number_of_keyframes() == 0) {
-            LOG_IF(WARNING, interpolator()->number_of_keyframes() == 0)
-                            << "nothing to preview (camera path is empty). You may import a camera path from a file or"
-                               " creat it by adding keyframes";
+            LOG_IF(interpolator()->number_of_keyframes() == 0, WARNING)
+                    << "nothing to preview (camera path is empty). "
+                       "You may import a camera path from a file or create it by adding keyframes";
             disconnect(previewButton, SIGNAL(toggled(bool)), this, SLOT(preview(bool)));
             previewButton->setChecked(false);
             connect(previewButton, SIGNAL(toggled(bool)), this, SLOT(preview(bool)));
             return;
         }
 
-        easy3d::connect(&interpolator()->interpolation_stopped, 0, interpolationStopped);
+        id_interpolationStopped = easy3d::connect(&interpolator()->interpolation_stopped, interpolationStopped);
         QObject::connect(this, &DialogWalkThrough::previewStopped, this, &DialogWalkThrough::onPreviewStopped);
 
         for (auto w : findChildren<QLabel*>()) w->setEnabled(false);
@@ -343,14 +347,15 @@ void DialogWalkThrough::preview(bool b) {
         for (auto w : findChildren<QToolButton*>()) w->setEnabled(false);
 
         LOG(INFO) << "preview started...";
+        w.start();
         interpolator()->start_interpolation();
     }
     else {
-        easy3d::disconnect(&interpolator()->interpolation_stopped, 0);
+        easy3d::disconnect(&interpolator()->interpolation_stopped, id_interpolationStopped);
         QObject::disconnect(this, &DialogWalkThrough::previewStopped, this, &DialogWalkThrough::onPreviewStopped);
 
         interpolator()->stop_interpolation();
-        LOG(INFO) << "animation finished";
+        LOG(INFO) << "preview finished. " << w.time_string();
 
         for (auto w : findChildren<QLabel*>()) w->setEnabled(true);
         for (auto w : findChildren<QPushButton*>()) w->setEnabled(true);
@@ -362,6 +367,8 @@ void DialogWalkThrough::preview(bool b) {
         for (auto w : findChildren<QToolButton*>()) w->setEnabled(true);
 
         setWalkingMode(radioButtonWalkingMode->isChecked());
+
+        viewer_->update();
     }
 #endif
 }
@@ -369,7 +376,7 @@ void DialogWalkThrough::preview(bool b) {
 
 void DialogWalkThrough::record() {
     if (!interpolator() || interpolator()->number_of_keyframes() == 0) {
-        LOG_IF(WARNING, interpolator()->number_of_keyframes() == 0)
+        LOG_IF(interpolator()->number_of_keyframes() == 0, WARNING)
                         << "nothing to record (camera path is empty). You may import a camera path from a file or"
                            " creat it by adding keyframes";
         return;
@@ -379,7 +386,7 @@ void DialogWalkThrough::record() {
         previewButton->setChecked(false);
 
     // make sure the path is not visible in recording
-    const bool visible = walkThrough()->is_path_visible();
+    const bool visible = walkThrough()->path_visible();
     if (visible)
         walkThrough()->set_path_visible(false);
 
@@ -390,8 +397,9 @@ void DialogWalkThrough::record() {
     hide();
     QApplication::processEvents();
     LOG(INFO) << "recording started...";
+    StopWatch w;
     viewer_->recordAnimation(file, fps, bitrate, true);
-    LOG(INFO) << "recording finished";
+    LOG(INFO) << "recording finished. " << w.time_string() << std::endl;
 
     // restore
     if (visible)
@@ -421,7 +429,7 @@ void DialogWalkThrough::showCameraPath(bool b) {
         Box3 box;
         for (auto m : viewer_->models())
             box.add_box(m->bounding_box());
-        viewer_->camera()->setSceneBoundingBox(box.min(), box.max());
+        viewer_->camera()->setSceneBoundingBox(box.min_point(), box.max_point());
     }
     viewer_->update();
 }
@@ -474,20 +482,8 @@ void DialogWalkThrough::importCameraPathFromFile() {
     std::ifstream input(fileName.toStdString().c_str());
     if (interpolator()->read_keyframes(input)) {
         LOG(INFO) << interpolator()->number_of_keyframes() << " keyframes loaded";
-        if (walkThrough()->is_path_visible()) {
-            // update scene radius to make sure the path is within the view frustum
-            int num = interpolator()->number_of_keyframes();
-            float radius = viewer_->camera()->sceneRadius();
-            for (int i = 0; i < num; ++i) {
-                radius = std::max(
-                        radius,
-                        distance(viewer_->camera()->sceneCenter(), interpolator()->keyframe(i).position())
-                );
-            }
-            viewer_->camera()->setSceneRadius(radius);
-            viewer_->update();
-        }
-
+        if (walkThrough()->path_visible())
+            showCameraPath(true);   // change the scene bbox
         numKeyramesChanged();
     }
 

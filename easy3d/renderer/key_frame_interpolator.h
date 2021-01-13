@@ -38,6 +38,7 @@
 #include <easy3d/core/types.h>
 #include <easy3d/core/signal.h>
 #include <easy3d/util/timer.h>
+#include <easy3d/renderer/frame.h>
 
 #include <vector>
 
@@ -373,7 +374,7 @@ namespace easy3d {
         void update_keyframe_values(std::vector<Keyframe>& keyframes);
         void get_keyframes_at_time(float time, const std::vector<Keyframe>& keyframes, std::vector<Keyframe>::const_iterator* related) const;
         void compute_spline(const std::vector<Keyframe>::const_iterator* related, vec3& v1, vec3& v2) const;
-        void do_interpolate(std::vector<Frame>& frames, std::vector<Keyframe>& keyframes);
+        void do_interpolate(std::vector<Frame>& frames, const std::vector<Keyframe>& keyframes) const;
 
         // stride-length weighted keyframe timing.
         // both keyframes.front().time() and keyframes.back().time() are preserved.
@@ -390,7 +391,7 @@ namespace easy3d {
         std::vector<Frame> interpolated_path_;
 
         // Rhythm
-        Timer timer_;
+        Timer<> timer_;
         int fps_;
         float interpolation_speed_;
         bool interpolation_started_;
@@ -403,8 +404,8 @@ namespace easy3d {
         LinesDrawable* cameras_drawable_;
 
     public:
-        Signal frame_interpolated;
-        Signal interpolation_stopped;
+        Signal<> frame_interpolated;
+        Signal<> interpolation_stopped;
     };
 
 }

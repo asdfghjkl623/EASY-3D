@@ -25,7 +25,7 @@ uniform bool highlight;
 uniform int  hightlight_id_min;
 uniform int  hightlight_id_max;
 
-//uniform bool selected;
+uniform bool selected = false;
 
 in Data{
 	vec3 position;
@@ -42,6 +42,8 @@ void main()
 	vec3 color = texture(textureID, DataIn.texcoord).rgb;
 	if (!lighting) {
 		outputF = vec4(color, 1.0);
+		if (selected)
+			outputF = mix(outputF, vec4(1.0, 0.0, 0.0, 1.0), 0.6);
 		return;
 	}
 
@@ -58,6 +60,9 @@ void main()
 		if (dot(normal, view_dir) < 0)
 			color = backside_color;
 	}
+
+	if (selected)
+		color = mix(color, vec3(1.0, 0.0, 0.0), 0.6);
 
 	float df = 0.0;// diffuse factor
 	if (two_sides_lighting)

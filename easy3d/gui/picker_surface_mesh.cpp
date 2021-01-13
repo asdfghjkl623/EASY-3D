@@ -30,6 +30,7 @@
 #include <easy3d/renderer/framebuffer_object.h>
 #include <easy3d/renderer/opengl_error.h>
 #include <easy3d/renderer/drawable_triangles.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/util/logging.h>
 
 
@@ -61,7 +62,7 @@ namespace easy3d {
             }
             if (!program_) {
                 use_gpu_if_supported_ = false;
-                LOG_FIRST_N(ERROR, 1) << "shader program not available, default to CPU implementation (this is the first record)";
+                LOG_FIRST_N(1, ERROR) << "shader program not available, default to CPU implementation. " << COUNTER;
             }
         }
 
@@ -242,7 +243,7 @@ namespace easy3d {
     SurfaceMesh::Face SurfaceMeshPicker::pick_face_gpu(SurfaceMesh *model, int x, int y) {
         auto drawable = model->renderer()->get_triangles_drawable("faces");
         if (!drawable) {
-            LOG_FIRST_N(WARNING, 1) << "drawable 'faces' does not exist";
+            LOG_FIRST_N(1, WARNING) << "drawable 'faces' does not exist. " << COUNTER;
             return SurfaceMesh::Face();
         }
 
@@ -270,7 +271,8 @@ namespace easy3d {
         easy3d_debug_log_frame_buffer_error;
 
         program_->bind();
-        program_->set_uniform("MVP", camera()->modelViewProjectionMatrix());
+        program_->set_uniform("MVP", camera()->modelViewProjectionMatrix())
+                ->set_uniform("MANIP", model->manipulator()->matrix());
         drawable->gl_draw(false);
         program_->release();
 
@@ -350,7 +352,7 @@ namespace easy3d {
         if (ymin > ymax) std::swap(ymin, ymax);
 
         // Get combined model-view and projection matrix
-        const mat4& m = camera()->modelViewProjectionMatrix();
+        const mat4& m = camera()->modelViewProjectionMatrix() * model->manipulator()->matrix();
         const auto& points = model->get_vertex_property<vec3>("v:point").vector();
         int num = model->n_vertices();
 
@@ -412,15 +414,15 @@ namespace easy3d {
         }
 
         const Box2& box = plg.bbox();
-        float xmin = box.min().x / (win_width - 1.0f);
-        float ymin = 1.0f - box.min().y / (win_height - 1.0f);
-        float xmax = box.max().x / (win_width - 1);
-        float ymax = 1.0f - box.max().y / (win_height - 1.0f);
+        float xmin = box.min_point().x / (win_width - 1.0f);
+        float ymin = 1.0f - box.min_point().y / (win_height - 1.0f);
+        float xmax = box.max_point().x / (win_width - 1);
+        float ymax = 1.0f - box.max_point().y / (win_height - 1.0f);
         if (xmin > xmax) std::swap(xmin, xmax);
         if (ymin > ymax) std::swap(ymin, ymax);
 
         // Get combined model-view and projection matrix
-        const mat4& m = camera()->modelViewProjectionMatrix();
+        const mat4& m = camera()->modelViewProjectionMatrix() * model->manipulator()->matrix();
         const auto& points = model->get_vertex_property<vec3>("v:point").vector();
         int num = model->n_vertices();
 
