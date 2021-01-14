@@ -26,6 +26,8 @@
 #define EASY3D_RENDERER_BUFFERS_H
 
 
+#include <easy3d/renderer/state.h>
+
 #include <string>
 
 namespace easy3d {
@@ -110,15 +112,12 @@ namespace easy3d {
         /**
          * @brief Update render buffers for a vector field defined on a surface mesh.
          * @param model     The model.
-         * @param drawable  The drawable.
+         * @param drawable  The The drawable for visualizing the vector field.
          * @param field The name of the vector field.
-         * @param location The location where the vector is defined.
-         *         - 0: on faces;
-         *         - 1: on vertices.
-         *         - 2: one edges
+         * @param location The location where the vector field is defined.
          * @param scale The scale of the vector length w.r.t. the average edge length of the surface mesh.
          */
-        void update(SurfaceMesh *model, LinesDrawable *drawable, const std::string& field, int location, float scale);
+        void update(SurfaceMesh *model, LinesDrawable *drawable, const std::string& field, State::Location location, float scale);
         //@}
 
 
@@ -175,6 +174,17 @@ namespace easy3d {
          * @param border  \c true for the boundary drawable and \c false for the interior drawable.
          */
         void update(PolyMesh* model, TrianglesDrawable* drawable, bool border);
+
+        /**
+         * @brief Update render buffers for a vector field defined on a polyhedral mesh.
+         * @param model     The model.
+         * @param drawable  The drawable for visualizing the vector field.
+         * @param field The name of the vector field.
+         * @param location The location where the vector field is defined.
+         * @param scale The scale of the vector length w.r.t. the average edge length of the polyhedral mesh.
+         * \note Only the scalar fields on border faces and vertices are supported.
+         */
+        void update(PolyMesh *model, LinesDrawable *drawable, const std::string& field, State::Location location, float scale);
         //@}
 
     }   // namespaces buffers
