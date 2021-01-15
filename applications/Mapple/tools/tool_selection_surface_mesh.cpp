@@ -205,18 +205,22 @@ namespace easy3d {
             delete picker_;
         }
 
-
         void MultitoolSurfaceMeshFaceSelectionRect::press(ToolButton button, int x, int y) {
             MultiTool::press(button, x, y);
             start_ = vec2(x, y);
             end_ = vec2(x, y);
         }
 
+        void MultitoolSurfaceMeshFaceSelectionRect::release(ToolButton button, int x, int y) {
+            MultiTool::release(button, x, y);
+            clear_hint();
+        }
 
         void MultitoolSurfaceMeshFaceSelectionRect::prepare_hint(ToolButton button, int x, int y) {
-            if (button != NO_BUTTON && picker_) {
+            if (button != NO_BUTTON && picker_)
                 end_ = vec2(x, y);
-            }
+            else
+                clear_hint();
         }
 
         void MultitoolSurfaceMeshFaceSelectionRect::clear_hint() {
