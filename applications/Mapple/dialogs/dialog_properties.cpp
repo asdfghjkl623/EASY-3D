@@ -40,7 +40,7 @@
 
 
 static std::vector<std::string> key_words = {
-        "v:point", "v:connectivity", "v:deleted", "v:normal", "f:normal",
+        "v:point", "v:connectivity", "v:deleted",
         "f:connectivity", "f:deleted", "f:triangle_range",
         "e:deleted", "h:connectivity"
 };
@@ -272,7 +272,7 @@ namespace details {
         else if (info == typeid(vec2)) return "vec2";
         else if (info == typeid(vec3)) return "vec3";
         else
-            return "void";
+            return info.name();
     }
 
     template<typename MODEL, typename SourceType, typename TargetType>
@@ -1006,7 +1006,8 @@ void DialogProperties::propertyChanged(const QString &name) {
     if (type != "void")
         comboBoxSourceType->addItem(type);
     else
-        LOG(WARNING) << "unrecognized data type for property '" << property_name << "' defined on '" << location << "'";
+        LOG(WARNING) << "unrecognized data type (" << type.toStdString() << ") for property '"
+                     << property_name << "' defined on '" << location << "'";
 }
 
 

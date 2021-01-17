@@ -233,15 +233,15 @@ void MainWindow::send(el::Level level, const std::string &msg) {
             break;
         case el::Level::Warning:
             ui->listWidgetLog->addItem(QString::fromStdString("[WARNING] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkBlue);
+            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::blue);
             break;
         case el::Level::Error:
             ui->listWidgetLog->addItem(QString::fromStdString("[ERROR] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkMagenta);
+            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::red);
             break;
         case el::Level::Fatal:
             ui->listWidgetLog->addItem(QString::fromStdString("[FATAL] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::red);
+            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkRed);
             break;
         default: break;
     }
@@ -445,8 +445,8 @@ bool MainWindow::onSave() {
                 this,
                 "Open file(s)",
                 QString::fromStdString(default_file_name),
-                "Supported formats (*.ply *.obj *.off *.stl *.smesh *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg *.plm *.pm *.mesh)\n"
-                "Surface Mesh (*.ply *.obj *.off *.stl *.smesh)\n"
+                "Supported formats (*.ply *.obj *.off *.stl *.sm *.bin *.las *.laz *.xyz *.bxyz *.vg *.bvg *.plm *.pm *.mesh)\n"
+                "Surface Mesh (*.ply *.obj *.off *.stl *.sm)\n"
                 "Point Cloud (*.ply *.bin *.ptx *.las *.laz *.xyz *.bxyz *.vg *.bvg)\n"
                 "Polyhedral Mesh (*.plm *.pm *.mesh)\n"
                 "All formats (*.*)"
@@ -498,7 +498,7 @@ Model* MainWindow::open(const std::string& file_name) {
         is_ply_mesh = (io::PlyReader::num_instances(file_name, "face") > 0);
 
     Model* model = nullptr;
-    if ((ext == "ply" && is_ply_mesh) || ext == "obj" || ext == "off" || ext == "stl" || ext == "smesh" || ext == "plg" || ext == "trilist") { // mesh
+    if ((ext == "ply" && is_ply_mesh) || ext == "obj" || ext == "off" || ext == "stl" || ext == "sm" || ext == "plg" || ext == "trilist") { // mesh
         model = SurfaceMeshIO::load(file_name);
     }
     else if (ext == "ply" && io::PlyReader::num_instances(file_name, "edge") > 0) {
@@ -973,27 +973,29 @@ void MainWindow::createActionsForPolyMeshMenu() {
 void MainWindow::operationModeChanged(QAction* act) {
     if (act == ui->actionCameraManipulation) {
         viewer()->tool_manager()->set_tool(tools::ToolManager::EMPTY_TOOL);
+        return;
     }
-    else if (act == ui->actionSelectClick) {
-        if (dynamic_cast<SurfaceMesh*>(viewer()->currentModel()))
-            viewer()->tool_manager()->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_CLICK_TOOL);
+
+    auto tool_manager = viewer()->tool_manager();
+    if (act == ui->actionSelectClick) {
+        if (dynamic_cast<SurfaceMesh *>(viewer()->currentModel()))
+            tool_manager->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_CLICK_TOOL);
     }
     else if (act == ui->actionSelectRect) {
-        if (dynamic_cast<SurfaceMesh*>(viewer()->currentModel()))
-            viewer()->tool_manager()->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_RECT_TOOL);
-        else if (dynamic_cast<PointCloud*>(viewer()->currentModel()))
-            viewer()->tool_manager()->set_tool(tools::ToolManager::SELECT_POINT_CLOUD_RECT_TOOL);
+        if (dynamic_cast<SurfaceMesh *>(viewer()->currentModel()))
+            tool_manager->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_RECT_TOOL);
+        else if (dynamic_cast<PointCloud *>(viewer()->currentModel()))
+            tool_manager->set_tool(tools::ToolManager::SELECT_POINT_CLOUD_RECT_TOOL);
     }
     else if (act == ui->actionSelectLasso) {
-        if (dynamic_cast<SurfaceMesh*>(viewer()->currentModel()))
-            viewer()->tool_manager()->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_LASSO_TOOL);
-        else if (dynamic_cast<PointCloud*>(viewer()->currentModel()))
-            viewer()->tool_manager()->set_tool(tools::ToolManager::SELECT_POINT_CLOUD_LASSO_TOOL);
+        if (dynamic_cast<SurfaceMesh *>(viewer()->currentModel()))
+            tool_manager->set_tool(tools::ToolManager::SELECT_SURFACE_MESH_FACE_LASSO_TOOL);
+        else if (dynamic_cast<PointCloud *>(viewer()->currentModel()))
+            tool_manager->set_tool(tools::ToolManager::SELECT_POINT_CLOUD_LASSO_TOOL);
     }
 
     if (viewer()->tool_manager()->current_tool())
-        setStatusTip(QString::fromStdString(viewer()->tool_manager()->current_tool()->instruction()));
-    viewer()->update();
+        statusBar()->showMessage(QString::fromStdString(tool_manager->current_tool()->instruction()), 2000);
 }
 
 

@@ -54,6 +54,7 @@
 #include <easy3d/renderer/text_renderer.h>
 #include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/manipulator.h>
+#include <easy3d/renderer/buffers.h>
 #include <easy3d/fileio/resources.h>
 #include <easy3d/gui/picker_surface_mesh.h>
 #include <easy3d/gui/picker_model.h>
@@ -354,39 +355,6 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
             tool_manager()->release(bt, e->pos().x(), e->pos().y());
             doneCurrent();
         }
-
-#if 1 // delete selected faces/points
-        if (dynamic_cast<SurfaceMesh*>(currentModel())) {
-            auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
-            auto select = mesh->face_property<bool>("f:select");
-            std::size_t count(0);
-            for(auto f : mesh->faces()) {
-                if (select[f]) {
-                    mesh->delete_face(f);
-                    ++count;
-                }
-            }
-            mesh->collect_garbage();
-            mesh->manipulator()->reset();
-            mesh->renderer()->update(false);   // do not recompute the bounding box
-            LOG(INFO) << count << " faces deleted";
-        } else if (dynamic_cast<PointCloud*>(currentModel())) {
-            auto cloud = dynamic_cast<PointCloud*>(currentModel());
-            auto select = cloud->vertex_property<bool>("v:select");
-            std::size_t count(0);
-            for(auto v : cloud->vertices()) {
-                if (select[v]) {
-                    cloud->delete_vertex(v);
-                    ++count;
-                }
-            }
-            cloud->collect_garbage();
-            cloud->manipulator()->reset();
-            cloud->renderer()->update(false);   // do not recompute the bounding box
-            LOG(INFO) << count << " points deleted";
-        }
-        window_->updateUi();
-#endif
         update();
     }
     else if (pressed_button_ == Qt::LeftButton && e->modifiers() == Qt::ControlModifier) { // ZOOM_ON_REGION
@@ -889,6 +857,12 @@ void PaintCanvas::fitScreen() {
 }
 
 
+
+void PaintCanvas::update_ui() {
+    window_->updateUi();
+}
+
+
 vec3 PaintCanvas::pointUnderPixel(const QPoint &p, bool &found) const {
     // Qt (same as GLFW) uses upper corner for its origin while GL uses the lower corner.
     int glx = p.x();
@@ -1052,7 +1026,7 @@ void PaintCanvas::drawCornerAxes() {
             ->set_uniform("clippingPlaneEnabled", false)
             ->set_uniform("selected", false);  easy3d_debug_log_gl_error;
 
-    drawable_axes_->gl_draw(false); easy3d_debug_log_gl_error;
+    drawable_axes_->gl_draw(); easy3d_debug_log_gl_error;
     program->release();
 
     // restore
@@ -1179,7 +1153,7 @@ void PaintCanvas::postDraw() {
         program->set_uniform("MVP", proj);
         program->set_uniform("per_vertex_color", false);
         program->set_uniform("default_color", vec4(0.0f, 0.0f, 1.0f, 1.0f));
-        drawable.gl_draw(false);
+        drawable.gl_draw();
         program->release();
         glEnable(GL_DEPTH_TEST);   // restore
     }
@@ -1294,12 +1268,96 @@ void PaintCanvas::enableEyeDomeLighting(bool b) {
 
 
 void PaintCanvas::invertSelection() {
-    LOG(WARNING) << "planned to be implemented in a future release";
+    makeCurrent();
+    if (dynamic_cast<SurfaceMesh*>(currentModel())) {
+        auto mesh = dynamic_cast<SurfaceMesh *>(currentModel());
+        auto d = mesh->renderer()->get_triangles_drawable("faces");
+        if (d->coloring_method() != easy3d::State::SCALAR_FIELD || d->property_name() != "f:select") {
+            auto select = mesh->get_face_property<bool>("f:select");
+            if (!select)
+                mesh->add_face_property<bool>("f:select", false);
+            d->set_coloring(State::SCALAR_FIELD, State::FACE, "f:select");
+            buffers::update(mesh, d);
+        }
+
+        auto seleced = mesh->face_property<bool>("f:select");
+        for (auto f : mesh->faces())
+            seleced[f] = !seleced[f];
+
+        auto triangle_range = mesh->face_property<std::pair<int, int> >("f:triangle_range");
+
+        // update the drawable's texcoord buffer
+        std::vector<vec2> texcoords(d->num_vertices());
+        for (auto f : mesh->faces()) {
+            int start = triangle_range[f].first;
+            int end = triangle_range[f].second;
+            for (int idx = start; idx <= end; ++idx)
+                texcoords[idx * 3] = texcoords[idx * 3 + 1] = texcoords[idx * 3 + 2] = vec2(seleced[f],
+                                                                                            0.5f);
+        }
+        d->update_texcoord_buffer(texcoords);
+        d->set_coloring(State::SCALAR_FIELD, State::FACE, "f:select");
+    } else if (dynamic_cast<PointCloud*>(currentModel())) {
+        auto cloud = dynamic_cast<PointCloud*>(currentModel());
+        auto d = cloud->renderer()->get_points_drawable("vertices");
+        if (d->coloring_method() != easy3d::State::SCALAR_FIELD || d->property_name() != "v:select") {
+            auto select = cloud->get_vertex_property<bool>("v:select");
+            if (!select)
+                cloud->add_vertex_property<bool>("v:select", false);
+            d->set_coloring(State::SCALAR_FIELD, State::VERTEX, "v:select");
+            buffers::update(cloud, d);
+        }
+
+        auto selected = cloud->vertex_property<bool>("v:select");
+        for(auto v : cloud->vertices())
+            selected[v] = !selected[v];
+
+        // update the drawable's texcoord buffer
+        std::vector<vec2> texcoords(d->num_vertices());
+        for (auto v : cloud->vertices())
+            texcoords[v.idx()] = vec2(selected[v], 0.5f);
+        d->update_texcoord_buffer(texcoords);
+        d->set_coloring(State::SCALAR_FIELD, State::VERTEX, "v:select");
+    }
+    doneCurrent();
+
+    window_->updateUi();
+    update();
 }
 
 
 void PaintCanvas::deleteSelectedPrimitives() {
-    LOG(WARNING) << "planned to be implemented in a future release";
+    if (dynamic_cast<SurfaceMesh*>(currentModel())) {
+        auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
+        auto select_faces = mesh->face_property<bool>("f:select");
+        std::size_t count(0);
+        for(auto f : mesh->faces()) {
+            if (select_faces[f]) {
+                mesh->delete_face(f);
+                ++count;
+            }
+        }
+        mesh->collect_garbage();
+        mesh->manipulator()->reset();
+        mesh->renderer()->update(false);   // do not recompute the bounding box
+        LOG(INFO) << count << " faces deleted";
+    } else if (dynamic_cast<PointCloud*>(currentModel())) {
+        auto cloud = dynamic_cast<PointCloud*>(currentModel());
+        auto select_vertices = cloud->vertex_property<bool>("v:select");
+        std::size_t count(0);
+        for(auto v : cloud->vertices()) {
+            if (select_vertices[v]) {
+                cloud->delete_vertex(v);
+                ++count;
+            }
+        }
+        cloud->collect_garbage();
+        cloud->manipulator()->reset();
+        cloud->renderer()->update(false);   // do not recompute the bounding box
+        LOG(INFO) << count << " points deleted";
+    }
+    window_->updateUi();
+    update();
 }
 
 
@@ -1578,14 +1636,14 @@ void PaintCanvas::draw() {
         std::size_t count = 0;
         for (auto d : m->renderer()->lines_drawables()) {
             if (d->is_visible()) {
-                d->draw(camera(), false); easy3d_debug_log_gl_error;
+                d->draw(camera()); easy3d_debug_log_gl_error;
                 ++count;
             }
         }
 
         for (auto d : m->renderer()->points_drawables()) {
             if (d->is_visible())
-                d->draw(camera(), false); easy3d_debug_log_gl_error;
+                d->draw(camera()); easy3d_debug_log_gl_error;
         }
 
         if (count > 0) {
@@ -1594,7 +1652,7 @@ void PaintCanvas::draw() {
         }
         for (auto d : m->renderer()->triangles_drawables()) {
             if (d->is_visible())
-                d->draw(camera(), false); easy3d_debug_log_gl_error;
+                d->draw(camera()); easy3d_debug_log_gl_error;
         }
         if (count > 0)
             glDisable(GL_POLYGON_OFFSET_FILL);
