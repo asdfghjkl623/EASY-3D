@@ -50,15 +50,14 @@ namespace easy3d {
 
         void ToolPointCloudSelection::update_render_buffer(PointCloud* cloud) const {
             auto d = cloud->renderer()->get_points_drawable("vertices");
-            if (d->coloring_method() != easy3d::State::SCALAR_FIELD || d->property_name() != "v:select") {
-                auto select = cloud->get_vertex_property<bool>("v:select");
-                if (!select)
+            if ((d->coloring_method() != easy3d::State::SCALAR_FIELD) || (d->property_location() != State::VERTEX) || (d->property_name() != "v:select")) {
+                if (!cloud->get_vertex_property<bool>("v:select"))
                     cloud->add_vertex_property<bool>("v:select", false);
                 d->set_coloring(State::SCALAR_FIELD, State::VERTEX, "v:select");
                 buffers::update(cloud, d);
             }
             else {
-                auto select = cloud->vertex_property<bool>("v:select");
+                auto select = cloud->vertex_property<bool>("v:select", false);
                 // update the drawable's texcoord buffer
                 std::vector<vec2> texcoords(d->num_vertices());
                 for (auto v : cloud->vertices())
@@ -66,7 +65,6 @@ namespace easy3d {
                 d->update_texcoord_buffer(texcoords);
                 d->set_coloring(State::SCALAR_FIELD, State::VERTEX, "v:select");
             }
-            tool_manager_->viewer()->update_ui();
         }
 
         // -------------------- Rect Select ----------------------
@@ -88,7 +86,7 @@ namespace easy3d {
         void ToolPointCloudSelectionRect::release(int x, int y) {
             for (auto model : tool_manager()->viewer()->models()) {
                 auto cloud = dynamic_cast<PointCloud*>(model);
-                if (cloud) {
+                if (cloud && cloud->renderer()->is_visible()) {
                     picker_->pick_vertices(cloud, Rect(start_, vec2(x, y)), select_mode_ != SM_SELECT);
                     update_render_buffer(cloud);
                 }
@@ -157,7 +155,7 @@ namespace easy3d {
 
             for (auto model : tool_manager()->viewer()->models()) {
                 auto cloud = dynamic_cast<PointCloud*>(model);
-                if (cloud) {
+                if (cloud && cloud->renderer()->is_visible()) {
                     picker_->pick_vertices(cloud, lasso_, select_mode_ != SM_SELECT);
                     update_render_buffer(cloud);
                 }
