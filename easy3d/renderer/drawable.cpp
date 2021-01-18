@@ -117,12 +117,12 @@ namespace easy3d {
 
     void Drawable::internal_update_buffers() {
         if (!model_ && !update_func_) {
-            LOG_FIRST_N(1, ERROR)
+            LOG_FIRST_N(3, ERROR)
                 << "updating buffers failed: drawable not associated with a model and no update function specified. " << COUNTER;
             return;
         } else if (model_ && model_->points().empty()) {
             clear();
-            LOG_FIRST_N(1, WARNING) << "model has no valid geometry. " << COUNTER;
+            LOG_FIRST_N(3, WARNING) << "model has no valid geometry. " << COUNTER;
             return;
         }
 
@@ -249,11 +249,15 @@ namespace easy3d {
             return nullptr;
     }
 
-    /**
-     * \brief Gets the manipulator attached to this drawable.
-     * \details If the drawable is part of a model, it returns the model's manipulator.
-     */
-    const Manipulator* Drawable::manipulator() const { return manipulator_; }
+
+    const Manipulator* Drawable::manipulator() const {
+        if (manipulator_)
+            return manipulator_;
+        else if (model_)
+            return model_->manipulator();
+        else
+            return nullptr;
+    }
 
 
     mat4 Drawable::manipulated_matrix() const {

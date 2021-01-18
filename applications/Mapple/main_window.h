@@ -44,6 +44,7 @@ class PaintCanvas;
 class WidgetPointsDrawable;
 class WidgetLinesDrawable;
 class WidgetTrianglesDrawable;
+class WidgetModelList;
 
 namespace Ui {
     class MainWindow;
@@ -51,6 +52,7 @@ namespace Ui {
 
 namespace easy3d {
     class Model;
+    class Drawable;
 }
 
 
@@ -72,6 +74,11 @@ public:
     void setShowSelectedOnly(bool b);
 
     void setPointUnderMouse(const QString& text);
+
+    // ui stuff
+    WidgetModelList* widgetModelList() const;
+    void activeDrawableChanged(easy3d::Drawable*);
+    void updateWindowTitle();
 
 public slots:
     void enableCameraManipulation();
@@ -186,7 +193,6 @@ private:
     bool okToContinue();
     void readSettings();
     void writeSettings();
-    void updateWindowTitle();
 
     void updateRecentFileActions();
     QString strippedName(const QString &fullFileName);

@@ -5,6 +5,7 @@
 
 namespace easy3d {
     class Model;
+    class Drawable;
 }
 
 class MainWindow;
@@ -22,8 +23,6 @@ public:
     // single model
     void addModel(easy3d::Model *obj, bool make_current);
 
-    void deleteModel(easy3d::Model *obj, bool fit);
-
     void mergeModels(const std::vector<easy3d::Model *> &objs);
 
     void decomposeModel(easy3d::Model *obj);
@@ -31,6 +30,8 @@ public:
     void updateModelList();
 
     void prepareContextMenu(QMenu *menu);
+
+    void updateDrawableVisibility(easy3d::Drawable* d);
 
 private Q_SLOTS :
 
@@ -54,6 +55,9 @@ private Q_SLOTS :
     void modelItemSelectionChanged();
 
     void showContextMenu(const QPoint &p);
+
+signals:
+    void currentDrawableChanged(easy3d::Drawable*);
 
 protected:
     void mousePressEvent(QMouseEvent* e);
