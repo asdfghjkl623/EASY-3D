@@ -37,6 +37,7 @@ namespace easy3d
     namespace logging
     {
 
+        // \cond
         std::string log_file_name = "";
 
 
@@ -96,7 +97,7 @@ namespace easy3d
             el::Helpers::crashAbort(sig);
         }
 
-
+        // \endcond
 
         void initialize(bool info_to_stderr, int verbose_level, const std::string &log_file)
         {

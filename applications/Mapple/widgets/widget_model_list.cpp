@@ -1,6 +1,7 @@
 #include "widget_model_list.h"
 #include "main_window.h"
 #include "paint_canvas.h"
+#include "walk_through.h"
 
 #include <easy3d/core/graph.h>
 #include <easy3d/core/surface_mesh.h>
@@ -9,7 +10,6 @@
 #include <easy3d/core/surface_mesh_builder.h>
 #include <easy3d/algo/surface_mesh_components.h>
 #include <easy3d/renderer/renderer.h>
-#include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/drawable_points.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_triangles.h>
@@ -52,14 +52,17 @@ public:
         }
     }
 
-    void setVisibilityIcon(int column, bool visible) {
+    void setVisible(int column, bool visible) {
         static QIcon iconShow(QString::fromUtf8(":/resources/icons/show.png"));
         static QIcon iconHide(QString::fromUtf8(":/resources/icons/hide.png"));
         if (visible)
             QTreeWidgetItem::setIcon(column, iconShow);
-        else {
+        else
             QTreeWidgetItem::setIcon(column, iconHide);
-        }
+
+        int num = childCount();
+        for (int i=0; i<num; ++i)
+            this->child(i)->setDisabled(!visible);
     }
 
     void highlight(bool b) {
@@ -83,14 +86,13 @@ public:
 
     Drawable *drawable() { return drawable_; }
 
-    void setVisibilityIcon(int column, bool visible) {
+    void setVisible(int column, bool visible) {
         static QIcon iconShow(QString::fromUtf8(":/resources/icons/show.png"));
         static QIcon iconHide(QString::fromUtf8(":/resources/icons/hide.png"));
         if (visible)
             QTreeWidgetItem::setIcon(column, iconShow);
-        else {
+        else
             QTreeWidgetItem::setIcon(column, iconHide);
-        }
     }
 
 private:
@@ -151,8 +153,21 @@ void WidgetModelList::updateDrawableVisibility(easy3d::Drawable *d) {
             for (int j=0; j<num_children; ++j) {
                 auto d_item = dynamic_cast<DrawableItem *>(item->child(j));
                 if (d_item->drawable() == d)
-                    d_item->setVisibilityIcon(2, d->is_visible());
+                    d_item->setVisible(2, d->is_visible());
             }
+        }
+    }
+}
+
+
+void WidgetModelList::updateDrawableVisibilities() {
+    int num = topLevelItemCount();
+    for (int i = 0; i < num; ++i) {
+        auto item = dynamic_cast<ModelItem *>(topLevelItem(i));
+        int num_children = item->childCount();
+        for (int j = 0; j < num_children; ++j) {
+            auto d_item = dynamic_cast<DrawableItem *>(item->child(j));
+            d_item->setVisible(2, d_item->drawable()->is_visible());
         }
     }
 }
@@ -274,28 +289,28 @@ void WidgetModelList::updateModelList() {
 
         item->setData(0, Qt::DisplayRole, i + 1);
         item->setIcon(1);
-        item->setVisibilityIcon(2, model->renderer()->is_visible());
+        item->setVisible(2, model->renderer()->is_visible());
         item->setData(3, Qt::DisplayRole, QString::fromStdString(name));
         item->highlight(model == viewer()->currentModel());
 
 #if 1   // add the drawables as children
         for (auto d : model->renderer()->points_drawables()) {
             auto d_item = new DrawableItem(item, d);
-            d_item->setVisibilityIcon(2, d->is_visible());
+            d_item->setVisible(2, d->is_visible());
             d_item->setData(3, Qt::DisplayRole, QString::fromStdString(d->name()));
             item->addChild(d_item);
         }
 
         for (auto d : model->renderer()->lines_drawables()) {
             auto d_item = new DrawableItem(item, d);
-            d_item->setVisibilityIcon(2, d->is_visible());
+            d_item->setVisible(2, d->is_visible());
             d_item->setData(3, Qt::DisplayRole, QString::fromStdString(d->name()));
             item->addChild(d_item);
         }
 
         for (auto d : model->renderer()->triangles_drawables()) {
             auto d_item = new DrawableItem(item, d);
-            d_item->setVisibilityIcon(2, d->is_visible());
+            d_item->setVisible(2, d->is_visible());
             d_item->setData(3, Qt::DisplayRole, QString::fromStdString(d->name()));
             item->addChild(d_item);
         }
@@ -306,7 +321,9 @@ void WidgetModelList::updateModelList() {
     connect(this, SIGNAL(itemPressed(QTreeWidgetItem * , int)), this, SLOT(modelItemPressed(QTreeWidgetItem * , int)));
     connect(this, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(showContextMenu(const QPoint&)));
 
+    mainWindow_->updateRenderingPanel();
     mainWindow_->updateWindowTitle();
+    mainWindow_->updateStatusBar();
 }
 
 
@@ -345,11 +362,11 @@ void WidgetModelList::hideOtherModels(Model *cur) {
             continue;
         if (selected_only_ && model != cur) {
             model->renderer()->set_visible(false);
-            item->setVisibilityIcon(2, false);
+            item->setVisible(2, false);
         }
         else {
             model->renderer()->set_visible(true);
-            item->setVisibilityIcon(2, true);
+            item->setVisible(2, true);
         }
         item->highlight(model == viewer()->currentModel());
     }
@@ -476,17 +493,20 @@ void WidgetModelList::deleteSelected() {
             viewer()->deleteModel(item->model());
 	}
 
+    updateModelList();
+
 	Model* current_model = viewer()->currentModel();
 	if (selected_only_)
 		hideOtherModels(current_model);
-
-    updateModelList();
-    mainWindow_->updateRenderingPanel();
 
 	if (auto_focus_)
 		viewer()->fitScreen();
 	else
 		viewer()->update();
+
+    mainWindow_->updateRenderingPanel();
+    mainWindow_->updateWindowTitle();
+    mainWindow_->updateStatusBar();
 }
 
 
@@ -505,12 +525,14 @@ void WidgetModelList::currentModelItemChanged(QTreeWidgetItem *current, QTreeWid
 	if (selected_only_)
 		hideOtherModels(model);
 
-    mainWindow_->updateRenderingPanel();
-
     if (auto_focus_)
         viewer()->fitScreen(model);
     else
         viewer()->update();
+
+    mainWindow_->updateRenderingPanel();
+    mainWindow_->updateWindowTitle();
+    mainWindow_->updateStatusBar();
 }
 
 
@@ -520,7 +542,7 @@ void WidgetModelList::modelItemSelectionChanged() {
         ModelItem *item = dynamic_cast<ModelItem *>(topLevelItem(i));
 
         // don't allow changing selection for camera path creation
-        if (viewer()->walkThrough()->status() == easy3d::WalkThrough::STOPPED && viewer()->isSelectModelEnabled())
+        if (viewer()->walkThrough()->status() == WalkThrough::STOPPED && viewer()->isSelectModelEnabled())
             item->model()->renderer()->set_selected(item->isSelected());
     }
 
@@ -539,7 +561,7 @@ void WidgetModelList::modelItemPressed(QTreeWidgetItem *current, int column) {
         if (column == 2 && !selected_only_) {
             Model *model = current_item->model();
             bool visible = !model->renderer()->is_visible();
-            current_item->setVisibilityIcon(2, visible);
+            current_item->setVisible(2, visible);
             model->renderer()->set_visible(visible);
         }
     }
@@ -550,7 +572,7 @@ void WidgetModelList::modelItemPressed(QTreeWidgetItem *current, int column) {
             Drawable *d = drawable_item->drawable();
             bool visible = !d->is_visible();
             d->set_visible(visible);
-            drawable_item->setVisibilityIcon(2, visible);
+            drawable_item->setVisible(2, visible);
         }
         mainWindow_->activeDrawableChanged(drawable_item->drawable());
     }
@@ -573,6 +595,7 @@ void WidgetModelList::modelItemPressed(QTreeWidgetItem *current, int column) {
 
     mainWindow_->updateRenderingPanel();
     mainWindow_->updateWindowTitle();
+    mainWindow_->updateStatusBar();
 }
 
 

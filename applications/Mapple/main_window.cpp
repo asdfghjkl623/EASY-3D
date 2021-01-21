@@ -52,7 +52,6 @@
 #include <easy3d/renderer/clipping_plane.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_points.h>
-#include <easy3d/renderer/walk_through.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
 #include <easy3d/renderer/drawable_triangles.h>
 #include <easy3d/renderer/manipulator.h>
@@ -82,6 +81,7 @@
 #include <easy3d/util/stop_watch.h>
 
 #include "paint_canvas.h"
+#include "walk_through.h"
 
 #include "dialogs/dialog_snapshot.h"
 #include "dialogs/dialog_properties.h"
@@ -484,7 +484,7 @@ Model* MainWindow::open(const std::string& file_name) {
     auto models = viewer_->models();
     for (auto m : models) {
         if (m->name() == file_name) {
-            LOG(WARNING) << "model alreaded loaded: " << file_name;
+            LOG(WARNING) << "model already loaded: " << file_name;
             return nullptr;
         }
     }
@@ -522,11 +522,11 @@ Model* MainWindow::open(const std::string& file_name) {
         viewer_->addModel(model);
         viewer_->fitScreen(model);
         ui->treeWidgetModels->addModel(model, true);
+        setCurrentFile(QString::fromStdString(file_name));
 
         const auto keyframe_file = file_system::replace_extension(model->name(), "kf");
         if (file_system::is_file(keyframe_file)) {
-            std::ifstream input(keyframe_file.c_str());
-            if (viewer_->walkThrough()->interpolator()->read_keyframes(input))
+            if (viewer_->walkThrough()->interpolator()->read_keyframes(keyframe_file))
                 LOG(INFO) << "model has an accompanying animation file \'"
                           << file_system::simple_name(keyframe_file)
                           << "\' (also loaded)";

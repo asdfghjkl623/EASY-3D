@@ -48,6 +48,7 @@ namespace easy3d {
     class Frame;
     class Camera;
     class LinesDrawable;
+    class TrianglesDrawable;
 
     /**
      * \brief A keyframe interpolator for animation generation.
@@ -71,7 +72,7 @@ namespace easy3d {
      *
      *      During the interpolation, the KeyFrameInterpolator emits an \c frame_interpolated Signal which will usually
      *      be connected to the viewer's update() method. The interpolation is stopped when duration has reached.
-     *      Another Signal interpolation_stopped will be emited when the interpolation reaches its end or the when the
+     *      Another Signal interpolation_stopped will be emitted when the interpolation reaches its end or the when the
      *      stop_interpolation() method was triggered.
      *
      *      Note that a Camera has a keyframe_interpolator() method, that can be used to drive the Camera along a
@@ -207,13 +208,14 @@ namespace easy3d {
          * \details The \p index has to be in the range [0, number_of_keyframes()-1].
          * \sa set_keyframe_position()
          */
-        const vec3& keyframe_position(std::size_t index);
+        const vec3& keyframe_position(std::size_t index) const;
+
         /**
          * \brief Returns the orientation of the \p index-th keyframe.
          * \details The \p index has to be in the range [0, number_of_keyframes()-1].
          * \sa set_keyframe_orientation()
          */
-        const quat& keyframe_orientation(std::size_t index);
+        const quat& keyframe_orientation(std::size_t index) const;
 
         /**
          * \brief Returns the duration of the KeyFrameInterpolator path, expressed in seconds.
@@ -312,7 +314,7 @@ namespace easy3d {
 
     public:
         /// Computes and returns all the interpolated frames.
-        const std::vector<Frame>& interpolate(bool smoothing = true);
+        const std::vector<Frame>& interpolate();
         //@}
 
         /*! @name Path drawing */
@@ -320,12 +322,18 @@ namespace easy3d {
     public:
 
         /**
-         * \brief Draws the interpolated camera path along with virtual 3D cameras for the keyframes.
+         * \brief Draws the virtual 3D cameras for the keyframes.
          * \param camera The current camera used by the viewer.
          * \param camera_width Controls the size of the cameras. A good value can be 5% of the scene radius, or
          *      10% of the character height (in walking mode), for instance.
-         * The rendering state can be changes by calling the path/cameras drawable's related methods. */
-        virtual void draw_path(const Camera* camera, float camera_width);
+         */
+        virtual void draw_cameras(const Camera* camera, float camera_width, const vec4& color = vec4(0.5f, 0.8f, 0.5f, 1.0f));
+
+        /**
+         * \brief Draws the interpolated camera path.
+         * \param camera The current camera used by the viewer.
+         */
+        virtual void draw_path(const Camera* camera, float thickness = 2.0f, const vec4& color = vec4(1.0f, 1.0f, 0.5f, 1.0f));
 
         //@}
 
@@ -333,9 +341,9 @@ namespace easy3d {
         //@{
     public:
         /// saves the camera path to a file
-        bool save_keyframes(std::ostream& os) const;
+        bool save_keyframes(const std::string& file_name) const;
         /// reads camera path from a file
-        bool read_keyframes(std::istream& is);
+        bool read_keyframes(const std::string& file_name);
         //@}
 
     private:
@@ -344,43 +352,23 @@ namespace easy3d {
         KeyFrameInterpolator(const KeyFrameInterpolator& kfi);
         KeyFrameInterpolator& operator=(const KeyFrameInterpolator& kfi);
 
-#ifndef DOXYGEN
         // Internal private Keyframe representation
         class Keyframe
         {
         public:
             Keyframe(const Frame& fr, float t);
-
             const vec3& position() const { return p_; }
             const quat& orientation() const { return q_; }
-            const vec3& tgP() const { return tgP_; }
-            const quat& tgQ() const { return tgQ_; }
             float time() const { return time_; }
             void set_time(float t) { time_ = t; }
             void set_position(const vec3& p) { p_ = p; }
             void set_orientation(const quat& q) { q_ = q; }
             void flip_if_needed(const quat& prev); // flip its orientation if needed
-            void compute_tangent(const Keyframe& prev, const Keyframe& next);
         private:
-            vec3 p_, tgP_;
-            quat q_, tgQ_;
+            vec3 p_;
+            quat q_;
             float time_;
         };
-
-        // The algorithm for Catmull-Rom is described here:
-        //      https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
-        // Here is an implementation of the algorithm:
-        //      https://github.com/chen0040/cpp-spline
-        void update_keyframe_values(std::vector<Keyframe>& keyframes);
-        void get_keyframes_at_time(float time, const std::vector<Keyframe>& keyframes, std::vector<Keyframe>::const_iterator* related) const;
-        void compute_spline(const std::vector<Keyframe>::const_iterator* related, vec3& v1, vec3& v2) const;
-        void do_interpolate(std::vector<Frame>& frames, const std::vector<Keyframe>& keyframes) const;
-
-        // stride-length weighted keyframe timing.
-        // both keyframes.front().time() and keyframes.back().time() are preserved.
-        // slower_turning: true to make turning slower
-        void adjust_keyframe_times(std::vector<Keyframe>& keyframes, bool slower_turning);
-#endif
 
     private:
         // Associated frame
@@ -401,7 +389,7 @@ namespace easy3d {
         bool pathIsValid_;
 
         LinesDrawable* path_drawable_;
-        LinesDrawable* cameras_drawable_;
+        TrianglesDrawable* cameras_drawable_;
 
     public:
         Signal<> frame_interpolated;
