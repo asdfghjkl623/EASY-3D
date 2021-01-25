@@ -38,6 +38,7 @@
 namespace easy3d {
     class Camera;
     class Model;
+    class LinesDrawable;
     class TrianglesDrawable;
     class AmbientOcclusion;
     class Shadow;
@@ -88,6 +89,9 @@ public:
 	// moves the camera so that the 'model' is centered on the screen.
 	// if 'model' is NULL, it centers the entire scene (all models).
 	void fitScreen(const easy3d::Model* model);
+
+    // adjusts the scene radius so all models, cameras (and camera path) are within the view frustum.
+    void adjustSceneRadius();
 
     // Returns the coordinates of the 3D point located at pixel (x,y) on screen.
     // x, y: screen point expressed in pixel units with an origin in the upper left corner.
@@ -298,12 +302,14 @@ protected:
     QPoint  mouse_pressed_pos_;     // mouse pos when pressed
     int pressed_key_;
 
-    bool show_pivot_point_;
+    bool show_manip_sphere_;
 
     //----------------- viewer data -------------------
 
     // corner axes
     easy3d::TrianglesDrawable* drawable_axes_;
+    // anchor sphere and manipulated frame
+    easy3d::LinesDrawable* drawable_manip_sphere_;
 
     easy3d::ModelPicker* model_picker_;
     bool    allow_select_model_;

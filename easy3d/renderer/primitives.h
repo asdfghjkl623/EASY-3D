@@ -32,6 +32,8 @@
 
 namespace easy3d {
 
+    class LinesDrawable;
+
     namespace opengl
     {
         /**
@@ -123,10 +125,26 @@ namespace easy3d {
          */
         void draw_polygon_filled(const Polygon2& polygon, const vec4& color, int width, int height, float depth);
 
+        /**
+         * \brief Draws the outline (the 3 big circles) of a sphere.
+         * @param mvp The model view projection matrix.
+         * @param m The transformation matrix defining the sphere's location, radius, and orientation.
+         * \param axes \c true will also draw the three main axes.
+         */
+        void draw_sphere_big_circles(LinesDrawable* drawable, const mat4& mvp, const mat4& m, bool axes = true);
+
+        /**
+         * \brief Draws a box.
+         * @param mvp The model view projection matrix.
+         * @param m The transformation matrix defining the box's location, sizes, and orientation.
+         * \param abstracted \c true to draw an abstracted version (only part of its corners).
+         */
+        void draw_box_wire(LinesDrawable* drawable, const mat4& mvp, const mat4& m, bool abstracted = false);
+
 		//------  The following functions prepare data (points, normals, and colors) for rendering -----
 
 		/**
-		 * @brief Prepares data for a representing a grid as a set of line segments.
+		 * @brief Generates data for a grid as a set of line segments.
 		 * \details The grid is centered at vec3(0, 0, 0) and lies on the XOY plane.
 		 * @param x_steps The number of subdivisions along X direction.
 		 * @param y_steps The number of subdivisions along Y direction.
@@ -136,7 +154,23 @@ namespace easy3d {
         void prepare_grid(int x_steps, int y_steps, std::vector<vec3>& points, float depth = 0.0f, float scale = 0.5f);
 
         /**
-         * @brief Prepares data (points, normals, and colors) for a 3D sphere.
+         * @brief Generates data for a unit circle as a set of line segments.
+		 * \details The circle is centered at vec3(0, 0, 0) and lies on the XOY plane.
+         * \param slices. The number of subdivisions.
+         */
+        void prepare_circle(int slices, std::vector<vec3>& points, std::vector<unsigned int>& indices);
+
+        /**
+         * @brief Generates data for a unit box as a set of line segments.
+         * \details The box is centered at vec3(0, 0, 0) and is aligned with the main axes.
+         * \param size. The size of the box (width = height = depth).
+         * \param abstracted \c true to draw an abstracted version (only part of its corners).
+         */
+        void prepare_box(std::vector<vec3>& points, std::vector<vec3>& colors, bool abstracted = false);
+
+
+        /**
+         * @brief Generates data (points, normals, and colors) for a 3D sphere.
          * \param radius: the radius of the sphere.
          * \param slices: the number of subdivisions around the z axis (similar to lines of longitude).
          * \param stacks: the number of subdivisions along the z axis(similar to lines of latitude).
@@ -147,7 +181,7 @@ namespace easy3d {
         );
 
         /**
-         * @brief Prepares data (points, normals, and colors) for a 3D checker sphere.
+         * @brief Generates data (points, normals, and colors) for a 3D checker sphere.
          * \param radius: the radius of the sphere.
          * \param slices: the number of subdivisions around the z axis (similar to lines of longitude).
          * \param stacks: the number of subdivisions along the z axis(similar to lines of latitude).
@@ -191,7 +225,7 @@ namespace easy3d {
         );
 
         /**
-         * \brief Prepares data (points) for representing a camera in the 3D world as a set of lines.
+         * \brief Generates data (points) for representing a camera in the 3D world as a set of lines.
          * \param width The width of the camera. A good value can be 5% of the scene radius, or 10% of the
          *      character height (in walking mode).
          * \param hw_ratio The aspect ratio of the base quad defined as height/width (default 0.6).

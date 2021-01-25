@@ -110,13 +110,15 @@ void TutorialAmbientOcclusion::draw() const {
 		const mat4& MV = camera_->modelViewMatrix();
 		const vec4& wLightPos = inverse(MV) * setting::light_position;
 
-        ShaderProgram* program = ShaderManager::get_program("surface/surface_color");
+        ShaderProgram* program = ShaderManager::get_program("surface/surface");
 		if (!program) {
-			std::vector<ShaderProgram::Attribute> attributes;
-			attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"));
-			attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"));
-			attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::NORMAL, "vtx_normal"));
-            program = ShaderManager::create_program_from_files("surface/surface_color", attributes);
+            std::vector<ShaderProgram::Attribute> attributes = {
+                    ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"),
+                    ShaderProgram::Attribute(ShaderProgram::TEXCOORD, "vtx_texcoord"),
+                    ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"),
+                    ShaderProgram::Attribute(ShaderProgram::NORMAL, "vtx_normal")
+            };
+            program = ShaderManager::create_program_from_files("surface/surface", attributes);
 		}
 		if (!program)
 			return;
@@ -136,8 +138,8 @@ void TutorialAmbientOcclusion::draw() const {
             ->set_uniform("default_color", faces->color());
 
         const auto& range = faces->highlight_range();
-		program->set_uniform("hightlight_id_min", range.first)
-			->set_uniform("hightlight_id_max", range.second);
+		program->set_uniform("highlight_id_min", range.first)
+			->set_uniform("highlight_id_max", range.second);
 
         faces->gl_draw();
 

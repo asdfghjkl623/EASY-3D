@@ -22,63 +22,23 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef DIALOG_WALK_THROUGH_H
-#define DIALOG_WALK_THROUGH_H
 
-#include "dialog.h"
-#include "ui_dialog_walk_through.h"
+#ifndef DIALOG_POINT_CLOUD_NORMAL_ESTIMATION_H
+#define DIALOG_POINT_CLOUD_NORMAL_ESTIMATION_H
 
 
-namespace easy3d {
-    class KeyFrameInterpolator;
-}
+#include <QDialog>
+#include "ui_dialog_point_cloud_normal_estimation.h"
 
-class WalkThrough;
+class MainWindow;
 
-class DialogWalkThrough : public Dialog, public Ui::DialogWalkThroughClass
+class DialogPointCloudNormalEstimation : public QDialog, public Ui::DialogPointCloudNormalEstimation
 {
 	Q_OBJECT
 
 public:
-    explicit DialogWalkThrough(MainWindow *window);
-	~DialogWalkThrough();
-
-    easy3d::KeyFrameInterpolator* interpolator();
-    WalkThrough* walkThrough();
-
-public Q_SLOTS :
-
-    void setInterpolationMethod(int);
-    void clearPath();
-
-    void setWalkingMode(bool);
-
-    void goToKeyframe(int);
-    void goToPreviousKeyframe();
-    void goToNextKeyframe();
-    void removeLastKeyframe();
-
-    void browse();
-	void preview(bool);
-    void record();
-
-    void setFollowUp(bool);
-	void setCharacterHeightFactor(double);
-	void setCharacterDistanceFactor(double);
-
-	void setInterpolationSpeed(double);
-	void setFrameRate(int);
-
-    void onPreviewStopped();
-
-signals:
-    void previewStopped();
-
-protected:
-	virtual	void showEvent(QShowEvent* e);
-	virtual void closeEvent(QCloseEvent* e);
-
-    void numKeyramesChanged();
+    DialogPointCloudNormalEstimation(MainWindow *window);
+	~DialogPointCloudNormalEstimation();
 };
 
-#endif // DIALOG_WALK_THROUGH_H
+#endif // DLG_NORMAL_ESTIMATION_H

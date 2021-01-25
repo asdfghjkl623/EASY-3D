@@ -88,7 +88,8 @@
 #include "dialogs/dialog_poisson_reconstruction.h"
 #include "dialogs/dialog_surface_mesh_curvature.h"
 #include "dialogs/dialog_surface_mesh_sampling.h"
-#include "dialogs/dialog_ransac_primitive_extraction.h"
+#include "dialogs/dialog_point_cloud_normal_estimation.h"
+#include "dialogs/dialog_point_cloud_ransac_primitive_extraction.h"
 #include "dialogs/dialog_point_cloud_simplification.h"
 #include "dialogs/dialog_gaussian_noise.h"
 #include "dialogs/dialog_surface_mesh_fairing.h"
@@ -526,10 +527,11 @@ Model* MainWindow::open(const std::string& file_name) {
 
         const auto keyframe_file = file_system::replace_extension(model->name(), "kf");
         if (file_system::is_file(keyframe_file)) {
-            if (viewer_->walkThrough()->interpolator()->read_keyframes(keyframe_file))
+            if (viewer_->walkThrough()->interpolator()->read_keyframes(keyframe_file)) {
                 LOG(INFO) << "model has an accompanying animation file \'"
-                          << file_system::simple_name(keyframe_file)
-                          << "\' (also loaded)";
+                          << file_system::simple_name(keyframe_file) << "\' (loaded)";
+                viewer_->walkThrough()->start_walking({model});
+            }
         }
     }
 
@@ -895,6 +897,10 @@ void MainWindow::createActionsForCameraMenu() {
     connect(ui->actionSaveCameraStateToFile, SIGNAL(triggered()), this, SLOT(saveCameraStateToFile()));
     connect(ui->actionRestoreCameraStateFromFile, SIGNAL(triggered()), this, SLOT(restoreCameraStateFromFile()));
 
+    connect(ui->actionImportCameraPath, SIGNAL(triggered()), this, SLOT(importCameraPath()));
+    connect(ui->actionExportCameraPath, SIGNAL(triggered()), this, SLOT(exportCameraPath()));
+    connect(ui->actionShowCameraPath, SIGNAL(toggled(bool)), this, SLOT(setShowCameraPath(bool)));
+    connect(ui->actionShowCameras, SIGNAL(toggled(bool)), this, SLOT(setShowCameras(bool)));
     connect(ui->actionAnimation, SIGNAL(triggered()), this, SLOT(animation()));
 }
 
@@ -1462,26 +1468,30 @@ void MainWindow::pointCloudEstimateNormals() {
     if (!cloud)
         return;
 
-    PointCloudNormals pcn;
-    LOG(WARNING) << "TODO: add a dialog for parameter tuning" << std::endl;
-    pcn.estimate(cloud);
-
-    cloud->renderer()->update();
-    viewer()->update();
+    DialogPointCloudNormalEstimation dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        unsigned int k = dlg.lineEditNeighborSize->text().toUInt();
+        PointCloudNormals pcn;
+        pcn.estimate(cloud, k);
+        cloud->renderer()->update();
+        viewer()->update();
+    }
 }
 
 
 void MainWindow::pointCloudReorientNormals() {
-    PointCloud* cloud = dynamic_cast<PointCloud*>(viewer()->currentModel());
+    PointCloud *cloud = dynamic_cast<PointCloud *>(viewer()->currentModel());
     if (!cloud)
         return;
 
-    PointCloudNormals pcn;
-    LOG(WARNING) << "TODO: add a dialog for parameter tuning" << std::endl;
-    pcn.reorient(cloud);
-
-    cloud->renderer()->update();
-    viewer()->update();
+    DialogPointCloudNormalEstimation dlg(this);
+    if (dlg.exec() == QDialog::Accepted) {
+        unsigned int k = dlg.lineEditNeighborSize->text().toUInt();
+        PointCloudNormals pcn;
+        pcn.reorient(cloud, k);
+        cloud->renderer()->update();
+        viewer()->update();
+    }
 }
 
 
@@ -1844,9 +1854,9 @@ void MainWindow::pointCloudPoissonSurfaceReconstruction() {
 
 
 void MainWindow::pointCloudRansacPrimitiveExtraction() {
-    static DialogRansacPrimitiveExtraction* dialog = nullptr;
+    static DialogPointCloudRansacPrimitiveExtraction* dialog = nullptr;
     if (!dialog)
-        dialog = new DialogRansacPrimitiveExtraction(this);
+        dialog = new DialogPointCloudRansacPrimitiveExtraction(this);
     dialog->show();
 }
 
@@ -1977,7 +1987,7 @@ void MainWindow::animation() {
     if (!dialog)
         dialog = new DialogWalkThrough(this);
 
-    dialog->walkThrough()->start_walking(viewer_->models());
+    viewer_->walkThrough()->start_walking(viewer_->models());
 
     // don't allow model picking when creating camera paths.
     ui->actionSelectModel->setChecked(false);
@@ -1985,6 +1995,72 @@ void MainWindow::animation() {
         m->renderer()->set_selected(false);
 
     dialog->show();
+}
+
+
+void MainWindow::importCameraPath() {
+    std::string dir = "./";
+    if (viewer_->currentModel())
+        dir = file_system::parent_directory(viewer_->currentModel()->name());
+    QString suggested_dir = QString::fromStdString(dir);
+    const QString fileName = QFileDialog::getOpenFileName(
+            this,
+            "Import keyframes from file",
+            suggested_dir,
+            "Keyframe file (*.kf)\n"
+            "All formats (*.*)"
+    );
+
+    if (fileName.isEmpty())
+        return;
+
+    if (viewer_->walkThrough()->interpolator()->read_keyframes(fileName.toStdString())) {
+        LOG(INFO) << viewer_->walkThrough()->interpolator()->number_of_keyframes() << " keyframes loaded";
+        viewer_->adjustSceneRadius();
+    }
+
+    viewer_->update();
+}
+
+
+void MainWindow::exportCameraPath() {
+    if (viewer_->walkThrough()->interpolator()->number_of_keyframes() == 0) {
+        LOG(INFO) << "nothing can be exported (path is empty)";
+        return;
+    }
+
+    std::string name = "./keyframes.kf";
+    if (viewer_->currentModel())
+        name = file_system::replace_extension(viewer_->currentModel()->name(), "kf");
+
+    QString suggested_name = QString::fromStdString(name);
+    const QString fileName = QFileDialog::getSaveFileName(
+            this,
+            "Export keyframes to file",
+            suggested_name,
+            "Keyframe file (*.kf)\n"
+            "All formats (*.*)"
+    );
+
+    if (fileName.isEmpty())
+        return;
+
+    if (viewer_->walkThrough()->interpolator()->save_keyframes(fileName.toStdString()))
+        LOG(INFO) << "keyframes saved to file";
+}
+
+
+void MainWindow::setShowCameraPath(bool b) {
+    viewer_->walkThrough()->set_path_visible(b);
+    viewer_->adjustSceneRadius();
+    viewer_->update();
+}
+
+
+void MainWindow::setShowCameras(bool b) {
+    viewer_->walkThrough()->set_cameras_visible(b);
+    viewer_->adjustSceneRadius();
+    viewer_->update();
 }
 
 

@@ -131,10 +131,8 @@ set(${PROJECT_NAME}_SHADERS
         ../../resources/shaders/lines/lines_cones_texture.geom
         ../../resources/shaders/lines/lines_cones_texture.frag
        # surface
-        ../../resources/shaders/surface/surface_color.vert
-        ../../resources/shaders/surface/surface_color.frag
-        ../../resources/shaders/surface/surface_texture.vert
-        ../../resources/shaders/surface/surface_texture.frag
+        ../../resources/shaders/surface/surface.vert
+        ../../resources/shaders/surface/surface.frag
         # EDL
         ../../resources/shaders/edl/edl_bilateral_filter.vert
         ../../resources/shaders/edl/edl_bilateral_filter.frag
@@ -176,10 +174,8 @@ set(${PROJECT_NAME}_SHADERS
         ../../resources/shaders/transparency/dual_depth_peeling_final.frag
         ../../resources/shaders/transparency/dual_depth_peeling_init.vert
         ../../resources/shaders/transparency/dual_depth_peeling_init.frag
-        ../../resources/shaders/transparency/dual_depth_peeling_peel_color.vert
-        ../../resources/shaders/transparency/dual_depth_peeling_peel_color.frag
-        ../../resources/shaders/transparency/dual_depth_peeling_peel_texture.vert
-        ../../resources/shaders/transparency/dual_depth_peeling_peel_texture.frag
+        ../../resources/shaders/transparency/dual_depth_peeling_peel_rendering.vert
+        ../../resources/shaders/transparency/dual_depth_peeling_peel_rendering.frag
         #selection
         ../../resources/shaders/selection/selection_single_primitive.vert
         ../../resources/shaders/selection/selection_single_primitive.frag
@@ -198,7 +194,7 @@ add_library(${PROJECT_NAME} STATIC
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "easy3d")
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_INCLUDE_DIR})
-target_link_libraries(${PROJECT_NAME} glew core util fileio algo)
+target_link_libraries(${PROJECT_NAME} PUBLIC glew core util fileio algo)
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE GLEW_STATIC)
 

@@ -9,9 +9,13 @@ layout(std140) uniform Material {
 };
 
 // smooth shading
-uniform bool    smooth_shading = true;
+uniform bool  smooth_shading = true;
 
-uniform bool    is_background = false;
+// backside color
+uniform bool  distinct_back_color = true;
+uniform vec3  backside_color = vec3(0.8f, 0.4f, 0.4f);
+
+uniform bool  is_background = false;
 
 uniform sampler2DShadow  shadowMap;
 uniform float darkness;
@@ -23,16 +27,22 @@ in Data{
 	vec3 normal;
 	vec3 position;
 	vec4 shadowCoord;
+    float clipped;
 } DataIn;
 
 
 out vec4 FragColor;	// Ouput data
 
 
-vec3 shade(vec3 worldPos)
+vec4 shade(vec3 worldPos)
 {
+    if (DataIn.clipped > 0.0)
+        discard;
+
+    vec4 color = vec4(DataIn.color, 1.0f);
+
     if (is_background)
-        return DataIn.color;
+        return color;
 
     else {
         vec3 normal;
@@ -52,17 +62,16 @@ vec3 shade(vec3 worldPos)
         float sf = abs(dot(half_vector, normal));
         sf = pow(sf, shininess);
 
-        vec3 color = DataIn.color * df + specular * sf;
-        return color;
+        return vec4(DataIn.color * df + specular * sf, color.a);
     }
 }
 
 
 
 void main(void) {
-        vec3 color = shade(DataIn.position);
+        vec4 color = shade(DataIn.position);
         if (selected && !is_background)
-            color = mix(color, vec3(1.0, 0.0, 0.0), 0.6);
+            color = mix(color, vec4(1.0, 0.0, 0.0, 1.0), 0.6);
 
         vec3 coords = DataIn.shadowCoord.xyz / DataIn.shadowCoord.w;
         // to avoid shadow acne: See: http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-16-shadow-mapping/
@@ -73,8 +82,8 @@ void main(void) {
         visibility = (visibility < 0.9) ? (1.0 - darkness) : 1.0f;
 
         if (is_background)
-            FragColor = vec4(color * visibility, 1.0);
+            FragColor = color * visibility;
         else
-            FragColor = vec4(color * visibility + ambient, 1.0);
+            FragColor = color * visibility + vec4(ambient, 1.0);
 }
 

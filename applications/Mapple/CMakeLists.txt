@@ -53,7 +53,8 @@ set(${PROJECT_NAME}_HEADERS
         dialogs/dialog_gaussian_noise.h
         dialogs/dialog_poisson_reconstruction.h
         dialogs/dialog_properties.h
-        dialogs/dialog_ransac_primitive_extraction.h
+        dialogs/dialog_point_cloud_normal_estimation.h
+        dialogs/dialog_point_cloud_ransac_primitive_extraction.h
         dialogs/dialog_surface_mesh_sampling.h
         dialogs/dialog_snapshot.h
         dialogs/dialog_point_cloud_simplification.h
@@ -87,7 +88,8 @@ set(${PROJECT_NAME}_SOURCES
         dialogs/dialog_gaussian_noise.cpp
         dialogs/dialog_poisson_reconstruction.cpp
         dialogs/dialog_properties.cpp
-        dialogs/dialog_ransac_primitive_extraction.cpp
+        dialogs/dialog_point_cloud_normal_estimation.cpp
+        dialogs/dialog_point_cloud_ransac_primitive_extraction.cpp
         dialogs/dialog_surface_mesh_sampling.cpp
         dialogs/dialog_snapshot.cpp
         dialogs/dialog_point_cloud_simplification.cpp
@@ -117,7 +119,8 @@ set(${PROJECT_NAME}_FORMS
         dialogs/dialog_gaussian_noise.ui
         dialogs/dialog_poisson_reconstruction.ui
         dialogs/dialog_properties.ui
-        dialogs/dialog_ransac_primitive_extraction.ui
+        dialogs/dialog_point_cloud_normal_estimation.ui
+        dialogs/dialog_point_cloud_ransac_primitive_extraction.ui
         dialogs/dialog_surface_mesh_sampling.ui
         dialogs/dialog_snapshot.ui
         dialogs/dialog_point_cloud_simplification.ui
@@ -140,7 +143,44 @@ if (MSVC)
     #	add_executable( ${PROJECT_NAME} WIN32 ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES} )
     #       target_link_libraries( ${PROJECT_NAME} Qt5::WinMain )
 elseif (APPLE)
-    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
+    function(resource VAR SOURCE_PATH DESTINATION PATTERN)
+        file(GLOB_RECURSE _LIST CONFIGURE_DEPENDS ${SOURCE_PATH}/${PATTERN})
+        foreach (RESOURCE ${_LIST})
+            get_filename_component(_PARENT ${RESOURCE} DIRECTORY)
+            if (${_PARENT} STREQUAL ${SOURCE_PATH})
+                set(_DESTINATION ${DESTINATION})
+            else ()
+                file(RELATIVE_PATH _DESTINATION ${SOURCE_PATH} ${_PARENT})
+                set(_DESTINATION ${DESTINATION}/${_DESTINATION})
+            endif ()
+            set_property(SOURCE ${RESOURCE} PROPERTY MACOSX_PACKAGE_LOCATION ${_DESTINATION})
+        endforeach (RESOURCE)
+        set(${VAR} ${_LIST} PARENT_SCOPE)
+    endfunction()
+
+    resource(VERTEX_SHADERS ${EASY3D_ROOT}/resources/shaders Resources/shaders *.vert)
+    resource(GEOMETRY_SHADERS ${EASY3D_ROOT}/resources/shaders Resources/shaders *.geom)
+    resource(FRAGMENT_SHADERS ${EASY3D_ROOT}/resources/shaders Resources/shaders *.frag)
+    resource(COLORMAPS ${EASY3D_ROOT}/resources/colormaps Resources/colormaps *.png)
+    resource(FONTS ${EASY3D_ROOT}/resources/fonts Resources/fonts *.ttf)
+    resource(IMAGES ${EASY3D_ROOT}/resources/images Resources/images *.jpg)
+    resource(TEXTURES ${EASY3D_ROOT}/resources/textures Resources/textures *.png)
+
+    #Append the new files to the resources file list
+    list(APPEND ${PROJECT_NAME}_RESOURCES ${VERTEX_SHADERS} ${GEOMETRY_SHADERS} ${FRAGMENT_SHADERS} ${COLORMAPS} ${FONTS} ${IMAGES} ${TEXTURES})
+
+    # NOTE: Don't include the path in MACOSX_BUNDLE_ICON_FILE -- this is the property added to Info.plist
+    set(MACOSX_BUNDLE_ICON_FILE Mapple.icns)
+    # And this part tells CMake where to find and install the file itself
+    set(${PROJECT_NAME}_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/Mapple.icns)
+    set_source_files_properties(${${PROJECT_NAME}_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${${PROJECT_NAME}_ICON} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
+
+    ## Note: On macOS, high-DPI support is enabled by settings in the Info.plist file. Make sure they are present.
+    ## For more information, see: http://doc.qt.io/qt-5/highdpi.html
+    ## Enable high DPI support by using my Info.plist file in which I added NSHighResolutionCapable to be true.
+    set_target_properties(${PROJECT_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Mac/Mapple.plist)
 else ()
     add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
 endif ()
@@ -168,12 +208,4 @@ endif ()
 
 if (EASY3D_HAS_CGAL)
     target_link_libraries(${PROJECT_NAME} algo_ext)
-endif ()
-
-
-## Note: On macOS, high-DPI support is enabled by settings in the Info.plist file. Make sure they are present.
-## For more information, see: http://doc.qt.io/qt-5/highdpi.html
-## Enable high DPI support by using my Info.plist file in which I added NSHighResolutionCapable to be true.
-if (APPLE)
-    set_target_properties(${PROJECT_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Mac/Mapple.plist)
 endif ()

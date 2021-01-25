@@ -24,7 +24,7 @@
 
 /** ----------------------------------------------------------
  *
- * The code in this file is adapted from Surface_mesh with significant
+ * The code in this file is adapted from libQGLViewer with significant
  * modifications and enhancement.
  *		- libQGLViewer (version Version 2.7.1, Nov 17th, 2017)
  * The original code is available at
@@ -42,6 +42,7 @@
 #include <easy3d/renderer/drawable_triangles.h>
 #include <easy3d/renderer/primitives.h>
 #include <easy3d/renderer/camera.h>   // for drawing the camera path drawables
+#include <easy3d/core/spline_curve_fitting.h>
 #include <easy3d/core/spline_curve_interpolation.h>
 #include <easy3d/util/string.h>  // for formatting time string
 
@@ -52,6 +53,7 @@ namespace easy3d {
     KeyFrameInterpolator::KeyFrameInterpolator(Frame *frame)
             : frame_(frame)
             , fps_(30)
+            , interpolation_method_(INTERPOLATION)
             , interpolation_speed_(1.0f)
             , interpolation_started_(false)
             , last_stopped_index_(0)
@@ -175,6 +177,12 @@ namespace easy3d {
             return 0.0f;
         else
             return keyframes_.back().time();
+    }
+
+
+    void  KeyFrameInterpolator::set_interpolation_method(Method m) {
+        interpolation_method_ = m;
+        pathIsValid_ = false;
     }
 
 
@@ -391,44 +399,81 @@ namespace easy3d {
             prevQ = kf.orientation();
         }
 
-        LOG_IF(keyframes_.size() > 2, INFO) << "interpolating " << keyframes_.size() << " keyframes";
-
-        typedef Vec<7, float>  FramePoint;
-        std::vector< FramePoint > frame_points(keyframes_.size());
-        for (int i=0; i<keyframes_.size(); ++i) {
-            const auto& frame = keyframes_[i];
-            const auto& p = frame.position();
-            for (unsigned char j=0; j<3; ++j)
-                frame_points[i][j] = p[j];
-            const auto& q = frame.orientation();
-            for (unsigned char j=0; j<4; ++j)
-                frame_points[i][j+3] = q[j];
-        }
-
-        // spine interpolation
-        typedef SplineCurveInterpolation<FramePoint> Interpolator;
-        Interpolator interpolator;
-        interpolator.set_boundary(Interpolator::second_deriv, 0, Interpolator::second_deriv, 0, false);
-#if 1   // we choose the distance as parameter to have equal intervals.
-        interpolator.set_points(frame_points);
-#else // use accumulated time as parameter
-        std::vector<float> t(num, 0.0f);
-        for (std::size_t i = 0; i < num; ++i)
-            t[i] = i;
-        interpolator.set_points(t, frame_points);
-#endif
+        LOG_IF(keyframes_.size() > 2, INFO) << "interpolating " << keyframes_.size() << " keyframes...";
 
         interpolated_path_.clear();
         const float interval = interpolation_speed() * interpolation_period() / 1000.0f;
         const std::size_t num_frames = duration() / interval + 1;
-        for (int i = 0; i < num_frames; ++i) {
-            const FramePoint frame = interpolator.eval_f(static_cast<float>(i) / static_cast<float>(num_frames - 1));
-            vec3 pos(frame.data());
-            quat orient;
-            for (int j=0; j<4; ++j)
-                orient[j] = frame[j+3];
-            orient.normalize();
-            interpolated_path_.emplace_back(Frame(pos, orient));
+
+        if (interpolation_method_ == INTERPOLATION) {
+            // we choose the accumulated path length as parameter, so to have equal intervals.
+            std::vector<float> parameters(keyframes_.size());
+            std::vector<vec3> positions(keyframes_.size());
+            std::vector<vec4> orientations(keyframes_.size());
+            float dist(0.0f);
+            for (int i=0; i<keyframes_.size(); ++i) {
+                positions[i] = keyframes_[i].position();
+                const quat& orient = keyframes_[i].orientation();
+                for (unsigned char j=0; j<4; ++j)
+                    orientations[i][j] = orient[j];
+                if (i > 0)
+                    dist += distance(positions[i-1], positions[i]);
+                parameters[i] = dist;
+            }
+
+            // spine interpolation
+            typedef SplineCurveInterpolation<vec3> PosFitter;
+            PosFitter pos_fitter;
+            pos_fitter.set_boundary(PosFitter::second_deriv, 0, PosFitter::second_deriv, 0, false);
+            pos_fitter.set_points(parameters, positions);
+
+            typedef SplineCurveInterpolation<vec4> OrientFitter;
+            OrientFitter orient_fitter;
+            orient_fitter.set_boundary(OrientFitter::second_deriv, 0, OrientFitter::second_deriv, 0, false);
+            orient_fitter.set_points(parameters, orientations);
+
+            for (int i = 0; i < num_frames; ++i) {
+                const float u = static_cast<float>(i) / static_cast<float>(num_frames - 1);
+                const vec3 pos = pos_fitter.eval_f(u);
+                const vec4 q = orient_fitter.eval_f(u);
+                quat orient;
+                for (unsigned char j=0; j<4; ++j)
+                    orient[j] = q[j];
+                orient.normalize();
+                interpolated_path_.emplace_back(Frame(pos, orient));
+            }
+        }
+        else {
+            std::vector<vec3> positions(keyframes_.size());
+            std::vector<vec4> orientations(keyframes_.size());
+            for (int i=0; i<keyframes_.size(); ++i) {
+                positions[i] = keyframes_[i].position();
+                const quat& orient = keyframes_[i].orientation();
+                for (unsigned char j=0; j<4; ++j)
+                    orientations[i][j] = orient[j];
+            }
+
+            // spine fitting
+            const int order = 3;  // Smoothness of the spline (min 2)
+            typedef SplineCurveFitting <vec3> PosFitter;
+            PosFitter pos_fitter(order, PosFitter::eOPEN_UNIFORM);
+            pos_fitter.set_ctrl_points(positions);
+            const std::vector<float> parameters = pos_fitter.get_equally_spaced_parameters(num_frames);
+
+            typedef SplineCurveFitting <vec4> OrientFitter;
+            OrientFitter orient_fitter(order, OrientFitter::eOPEN_UNIFORM);
+            orient_fitter.set_ctrl_points(orientations);
+
+            for (int i = 0; i < num_frames; ++i) {
+                const float u = parameters[i];
+                const vec3 pos = pos_fitter.eval_f(u);
+                const vec4 q = orient_fitter.eval_f(u);
+                quat orient;
+                for (unsigned char j=0; j<4; ++j)
+                    orient[j] = q[j];
+                orient.normalize();
+                interpolated_path_.emplace_back(Frame(pos, orient));
+            }
         }
 
         LOG_IF(keyframes_.size() > 2, INFO)

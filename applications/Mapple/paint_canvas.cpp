@@ -91,8 +91,9 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , mouse_current_pos_(0, 0)
         , mouse_pressed_pos_(0, 0)
         , pressed_key_(-1)
-        , show_pivot_point_(false)
+        , show_manip_sphere_(false)
         , drawable_axes_(nullptr)
+        , drawable_manip_sphere_(nullptr)
         , model_picker_(nullptr)
         , allow_select_model_(false)
         , surface_mesh_picker_(nullptr)
@@ -142,6 +143,7 @@ void PaintCanvas::cleanup() {
     delete camera_;
     delete walkThrough();
     delete drawable_axes_;
+    delete drawable_manip_sphere_;
     delete ssao_;
     delete shadow_;
     delete transparency_;
@@ -282,32 +284,7 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
         }
     }
     else {
-        camera_->frame()->action_start();
-        if (pressed_key_ == Qt::Key_Z || e->modifiers() == Qt::ShiftModifier) {
-            if (e->button() == Qt::LeftButton) {
-                bool found = false;
-                const vec3 &p = pointUnderPixel(e->pos(), found);
-                if (found) {
-                    camera_->setPivotPoint(p);
-                    // show, but hide the visual hint of pivot point after \p delay milliseconds.
-                    show_pivot_point_ = true;
-                    Timer<>::single_shot(10000, [&]() {
-                        show_pivot_point_ = false;
-                        update();
-                    });
-                    if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
-                        camera()->interpolateToLookAt(p);
-                } else {
-                    camera_->setPivotPoint(camera_->sceneCenter());
-                    show_pivot_point_ = false;
-                }
-            } else if (e->button() == Qt::RightButton) {
-                camera_->setPivotPoint(camera_->sceneCenter());
-                show_pivot_point_ = false;
-                if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
-                    camera()->interpolateToFitScene();
-            }
-        } else if (e->modifiers() == Qt::AltModifier) {
+        if (e->modifiers() == Qt::AltModifier) {
             bool found = false;
             const vec3 p = pointUnderPixel(e->pos(), found);
             if (found && (walkThrough()->status() == WalkThrough::WALKING_MODE) &&
@@ -319,21 +296,46 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
             else if (walkThrough()->status() == WalkThrough::FREE_MODE) {
                 LOG(WARNING) << "Alt + Left click is for the walking mode only. Press 'K' to add a keyframe in the free mode";
             }
-        } else if (e->modifiers() == Qt::NoModifier && e->button() == Qt::LeftButton &&
-                   walkThrough()->status() == WalkThrough::STOPPED && allow_select_model_)
-        {
-            if (!model_picker_)
-                model_picker_ = new ModelPicker(camera());
-            makeCurrent();
-            auto model = model_picker_->pick(models(), e->pos().x(), e->pos().y());
-            doneCurrent();
-            if (model) {
-                setCurrentModel(model);
-                window_->updateUi();
+        } else {
+            if (e->button() == Qt::LeftButton)
+                show_manip_sphere_ = true;
+
+            if (e->modifiers() == Qt::NoModifier && e->button() == Qt::LeftButton &&
+                walkThrough()->status() == WalkThrough::STOPPED && allow_select_model_) {
+                if (!model_picker_)
+                    model_picker_ = new ModelPicker(camera());
+                makeCurrent();
+                auto model = model_picker_->pick(models(), e->pos().x(), e->pos().y());
+                doneCurrent();
+                if (model) {
+                    setCurrentModel(model);
+                    window_->updateUi();
+                }
+                // select the picked model (if picked) and deselect others
+                for (auto m : models_)
+                    m->renderer()->set_selected(m == model);
             }
-            // select the picked model (if picked) and deselect others
-            for (auto m : models_)
-                m->renderer()->set_selected(m == model);
+
+            else {
+                camera_->frame()->action_start();
+
+                if (pressed_key_ == Qt::Key_Z || e->modifiers() == Qt::ShiftModifier) {
+                    if (e->button() == Qt::LeftButton) {
+                        bool found = false;
+                        const vec3 &p = pointUnderPixel(e->pos(), found);
+                        if (found) {
+                            camera_->setPivotPoint(p);
+                            if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
+                                camera()->interpolateToLookAt(p);
+                        } else
+                            camera_->setPivotPoint(camera_->sceneCenter());
+                    } else if (e->button() == Qt::RightButton) {
+                        camera_->setPivotPoint(camera_->sceneCenter());
+                        if (pressed_key_ == Qt::Key_Z && e->modifiers() == Qt::NoModifier)
+                            camera()->interpolateToFitScene();
+                    }
+                }
+            }
             update();
         }
     }
@@ -345,8 +347,9 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
 void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
     if (tool_manager()->current_tool()) {
         tools::ToolButton bt = tools::NO_BUTTON;
-        if (e->button() == Qt::LeftButton)
+        if (e->button() == Qt::LeftButton) {
             bt = tools::LEFT_BUTTON;
+        }
         else if (e->button() == Qt::RightButton)
             bt = tools::RIGHT_BUTTON;
         else if (e->button() == Qt::MidButton)
@@ -366,8 +369,12 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
         int ymax = std::max(mouse_pressed_pos_.y(), e->pos().y());
         camera_->fitScreenRegion(xmin, ymin, xmax, ymax);
     }
-    else
+    else {
+        if (e->button() == Qt::LeftButton)
+            show_manip_sphere_ = false;
         camera_->frame()->action_end();
+        update();
+    }
 
     pressed_button_ = Qt::NoButton;
     modifiers_ = Qt::NoModifier;
@@ -813,6 +820,7 @@ void PaintCanvas::addModel(Model *model) {
 
     models_.push_back(model);
     model_idx_ = static_cast<int>(models_.size()) - 1; // make the last one current
+    adjustSceneRadius();
 }
 
 
@@ -855,6 +863,7 @@ void PaintCanvas::fitScreen(const easy3d::Model *model) {
     if (box.is_valid()) {
         camera_->setSceneBoundingBox(box.min_point(), box.max_point());
         camera_->showEntireScene();
+        adjustSceneRadius();
         update();
     }
 }
@@ -862,6 +871,18 @@ void PaintCanvas::fitScreen(const easy3d::Model *model) {
 
 void PaintCanvas::fitScreen() {
     fitScreen(nullptr);
+}
+
+
+void PaintCanvas::adjustSceneRadius() {
+    Box3 box;
+    for (auto m : models_)
+        box.add_box(m->bounding_box(false));
+
+    const int count = walkThrough()->interpolator()->number_of_keyframes();
+    for (int i = 0; i < count; ++i)
+        box.add_point(walkThrough()->interpolator()->keyframe(i).position());
+   camera()->setSceneRadius(box.radius());
 }
 
 
@@ -950,13 +971,14 @@ void PaintCanvas::paintGL() {
 
 
 void PaintCanvas::drawCornerAxes() {
-    ShaderProgram *program = ShaderManager::get_program("surface/surface_color");
+    ShaderProgram *program = ShaderManager::get_program("surface/surface");
     if (!program) {
         std::vector<ShaderProgram::Attribute> attributes;
         attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"));
+        attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::TEXCOORD, "vtx_texcoord"));
         attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"));
         attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::NORMAL, "vtx_normal"));
-        program = ShaderManager::create_program_from_files("surface/surface_color", attributes);
+        program = ShaderManager::create_program_from_files("surface/surface", attributes);
     }
     if (!program)
         return;
@@ -1023,10 +1045,10 @@ void PaintCanvas::drawCornerAxes() {
             ->set_block_uniform("Material", "ambient", setting::material_ambient)
             ->set_block_uniform("Material", "specular", setting::material_specular)
             ->set_block_uniform("Material", "shininess", &setting::material_shininess)
-            ->set_uniform("hightlight_id_min", -1)
-            ->set_uniform("hightlight_id_max", -1)
+            ->set_uniform("highlight", false)
             ->set_uniform("clippingPlaneEnabled", false)
-            ->set_uniform("selected", false);  easy3d_debug_log_gl_error;
+            ->set_uniform("selected", false)
+            ->set_uniform("use_texture", false);  easy3d_debug_log_gl_error;
 
     drawable_axes_->gl_draw(); easy3d_debug_log_gl_error;
     program->release();
@@ -1129,38 +1151,6 @@ void PaintCanvas::postDraw() {
         walkThrough()->draw();
     easy3d_debug_log_gl_error;
 
-    if (show_pivot_point_ || pressed_button_ != Qt::NoButton) {
-        ShaderProgram *program = ShaderManager::get_program("lines/lines_plain_color");
-        if (!program) {
-            std::vector<ShaderProgram::Attribute> attributes;
-            attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"));
-            attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"));
-            program = ShaderManager::create_program_from_files("lines/lines_plain_color", attributes);
-        }
-        if (!program)
-            return;
-
-        const float size = 10;
-        LinesDrawable drawable("pivot_point"); easy3d_debug_log_gl_error;
-        const vec3 &pivot = camera()->projectedCoordinatesOf(camera()->pivotPoint());
-        std::vector<vec3> points = {
-                vec3(pivot.x - size, pivot.y, 0.5f), vec3(pivot.x + size, pivot.y, 0.5f),
-                vec3(pivot.x, pivot.y - size, 0.5f), vec3(pivot.x, pivot.y + size, 0.5f)
-        };
-        drawable.update_vertex_buffer(points); easy3d_debug_log_gl_error;
-
-        const mat4 &proj = transform::ortho(0.0f, width(), height(), 0.0f, 0.0f,-1.0f);
-        glDisable(GL_DEPTH_TEST);   // always on top
-        program->bind();
-        program->set_uniform("MVP", proj);
-        program->set_uniform("per_vertex_color", false);
-        program->set_uniform("default_color", vec4(0.0f, 0.0f, 1.0f, 1.0f));
-        drawable.gl_draw();
-        program->release();
-        glEnable(GL_DEPTH_TEST);   // restore
-    }
-    easy3d_debug_log_gl_error;
-
     if (show_labels_under_mouse_) {
         auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
         if (mesh && picked_face_index_ >= 0 && picked_face_index_ < mesh->n_faces()) {
@@ -1193,9 +1183,25 @@ void PaintCanvas::postDraw() {
 
     // -------------------- draw the clipping plane ----------------------------
 
-    //
     if (setting::clipping_plane)
         setting::clipping_plane->draw(camera());    easy3d_debug_log_gl_error;
+
+
+    // -------------------- draw a sphere outline
+
+    Model* m = currentModel();
+    if (m && m->renderer()->is_visible() && m->renderer()->is_selected()) {
+        m->manipulator()->draw_frame(camera_);
+    }
+    else if (show_manip_sphere_) {
+        if (!drawable_manip_sphere_)
+            drawable_manip_sphere_ = new LinesDrawable;
+
+        const int radius = 150; // pixels
+        float ratio = camera_->pixelGLRatio(camera_->pivotPoint());
+        auto manip = mat4::translation(camera_->pivotPoint()) * mat4::scale(radius * ratio) ;
+        opengl::draw_sphere_big_circles(drawable_manip_sphere_, camera_->modelViewProjectionMatrix(), manip);
+    }
 }
 
 

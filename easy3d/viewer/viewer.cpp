@@ -1353,13 +1353,15 @@ namespace easy3d {
 
 
     void Viewer::draw_corner_axes() const {
-        ShaderProgram *program = ShaderManager::get_program("surface/surface_color");
+        ShaderProgram *program = ShaderManager::get_program("surface/surface");
         if (!program) {
-            std::vector<ShaderProgram::Attribute> attributes;
-            attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"));
-            attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"));
-            attributes.emplace_back(ShaderProgram::Attribute(ShaderProgram::NORMAL, "vtx_normal"));
-            program = ShaderManager::create_program_from_files("surface/surface_color", attributes);
+            std::vector<ShaderProgram::Attribute> attributes = {
+                    ShaderProgram::Attribute(ShaderProgram::POSITION, "vtx_position"),
+                    ShaderProgram::Attribute(ShaderProgram::TEXCOORD, "vtx_texcoord"),
+                    ShaderProgram::Attribute(ShaderProgram::COLOR, "vtx_color"),
+                    ShaderProgram::Attribute(ShaderProgram::NORMAL, "vtx_normal")
+            };
+            program = ShaderManager::create_program_from_files("surface/surface", attributes);
         }
         if (!program)
             return;
@@ -1424,8 +1426,8 @@ namespace easy3d {
                 ->set_block_uniform("Material", "ambient", setting::material_ambient)
                 ->set_block_uniform("Material", "specular", setting::material_specular)
                 ->set_block_uniform("Material", "shininess", &setting::material_shininess)
-                ->set_uniform("hightlight_id_min", -1)
-                ->set_uniform("hightlight_id_max", -1);
+                ->set_uniform("highlight_id_min", -1)
+                ->set_uniform("highlight_id_max", -1);
         drawable_axes_->gl_draw();
         program->release();
 
