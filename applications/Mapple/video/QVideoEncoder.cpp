@@ -38,7 +38,7 @@ struct FFmpegStuffEnc
 	{}
 };
 
-QVideoEncoder::QVideoEncoder(QString filename, int width, int height, unsigned bitrate, int gop, int fps)
+QVideoEncoder::QVideoEncoder(const QString& filename, int width, int height, unsigned bitrate, int gop, int fps)
 	: m_filename(filename)
 	, m_width(width)
 	, m_height(height)
@@ -118,6 +118,9 @@ bool QVideoEncoder::open(QString* errorString/*=0*/)
 			*errorString = "Invalid video size";
 		return false;
 	}
+
+    // register all formats and codecs
+    av_register_all();
 
 	// find the output format
 	avformat_alloc_output_context2(&m_ff->formatContext, NULL, NULL, qPrintable(m_filename));
@@ -298,7 +301,7 @@ bool QVideoEncoder::close()
 	avio_close(m_ff->formatContext->pb);
 
 	// free the stream
-	av_free(m_ff->formatContext);
+	avformat_free_context(m_ff->formatContext);
 
 	m_isOpen = false;
 
@@ -405,7 +408,7 @@ bool QVideoEncoder::convertImage_sws(const QImage &image, QString* errorString/*
 	}
 
 	int num_bytes = av_image_get_buffer_size(AV_PIX_FMT_BGRA, m_width, m_height, 1);
-	if (num_bytes != image.sizeInBytes())
+	if (num_bytes != image.byteCount())
 	{
 		if (errorString)
 			*errorString = "[SWS] Number of bytes mismatch";

@@ -15,27 +15,6 @@ if (NOT QT5_FOUND)
 endif ()
 
 
-find_package(FFMPEG QUIET)
-if (NOT FFMPEG_FOUND)
-    message(WARNING "${PROJECT_NAME} requires FFMPEG to generate video files for animations but FFMPEG was not found. "
-            "Without FFMPEG, animations can only be recorded as a sequence of images. "
-            "To use FFMPEG, first set 'FFMPEG_DIR' to 'cmake/ffmpeg-config.cmake'. Then modify the 'ffmpeg_path' "
-            "variable in 'cmake/ffmpeg-config.cmake' to point to the folder in which FFMPEG was installed."
-            )
-else ()
-    add_subdirectory(video)
-    add_definitions(-DHAS_FFMPEG)
-    message(STATUS "   FFMPEG_INCLUDE_DIRS ${FFMPEG_INCLUDE_DIRS}")
-    message(STATUS "   FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES}")
-endif ()
-
-
-add_subdirectory(tools)
-
-
-# some algorithms may use OpenMP
-include(../../cmake/UseOpenMP.cmake)
-
 set(${PROJECT_NAME}_HEADERS
         main_window.h
         paint_canvas.h
@@ -137,7 +116,7 @@ set(${PROJECT_NAME}_RESOURCES
         mapple.qrc
         )
 
-if (MSVC)
+if (WIN32 OR MSVC)
     add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
     # if you want to get rid of the (system) console, use
     #	add_executable( ${PROJECT_NAME} WIN32 ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES} )
@@ -166,21 +145,30 @@ elseif (APPLE)
     resource(IMAGES ${EASY3D_ROOT}/resources/images Resources/images *.jpg)
     resource(TEXTURES ${EASY3D_ROOT}/resources/textures Resources/textures *.png)
 
-    #Append the new files to the resources file list
-    list(APPEND ${PROJECT_NAME}_RESOURCES ${VERTEX_SHADERS} ${GEOMETRY_SHADERS} ${FRAGMENT_SHADERS} ${COLORMAPS} ${FONTS} ${IMAGES} ${TEXTURES})
-
-    # NOTE: Don't include the path in MACOSX_BUNDLE_ICON_FILE -- this is the property added to Info.plist
-    set(MACOSX_BUNDLE_ICON_FILE Mapple.icns)
-    # And this part tells CMake where to find and install the file itself
+    # This tells CMake where to find and install the ICON file
     set(${PROJECT_NAME}_ICON ${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/Mapple.icns)
-    set_source_files_properties(${${PROJECT_NAME}_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
+
+    #Append the new files to the resources file list
+    list(APPEND ${PROJECT_NAME}_RESOURCES ${${PROJECT_NAME}_ICON} ${VERTEX_SHADERS} ${GEOMETRY_SHADERS} ${FRAGMENT_SHADERS} ${COLORMAPS} ${FONTS} ${IMAGES} ${TEXTURES})
 
     add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${${PROJECT_NAME}_ICON} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
+
+    set_source_files_properties(${${PROJECT_NAME}_ICON} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 
     ## Note: On macOS, high-DPI support is enabled by settings in the Info.plist file. Make sure they are present.
     ## For more information, see: http://doc.qt.io/qt-5/highdpi.html
     ## Enable high DPI support by using my Info.plist file in which I added NSHighResolutionCapable to be true.
-    set_target_properties(${PROJECT_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/resources/Mac/Mapple.plist)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+            INSTALL_RPATH "@executable_path/../Frameworks"
+            MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME}
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Mac/Mapple.plist"
+            MACOSX_BUNDLE_ICON_FILE "Mapple.icns"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
+            MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "liangliang.nan@gmail.com"
+            )
 else ()
     add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
 endif ()
@@ -200,12 +188,23 @@ if (MSVC)
 endif ()
 
 target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
-target_link_libraries(${PROJECT_NAME} renderer algo tools)
 
-if (FFMPEG_FOUND)
-    target_link_libraries(${PROJECT_NAME} video)
-endif ()
+add_subdirectory(tools)
+target_link_libraries(${PROJECT_NAME} renderer algo tools)
 
 if (EASY3D_HAS_CGAL)
     target_link_libraries(${PROJECT_NAME} algo_ext)
+endif ()
+
+include(../../cmake/FindFFMPEG.cmake)
+if (FFMPEG_FOUND)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_FFMPEG)
+    add_subdirectory(video)
+    target_link_libraries(${PROJECT_NAME} video)
+else ()
+    message(WARNING "${PROJECT_NAME} requires FFMPEG to generate video files but FFMPEG was not found. "
+            "Without FFMPEG, animations can only be recorded as a sequence of images. "
+            "To use FFMPEG, make sure FFMPEG exists on your system (install/build FFMPEG if necessary). "
+            "Modify the search paths in 'FindFFMPEG.cmake' for 'include' and 'lib' directories, and then run CMake."
+            )
 endif ()

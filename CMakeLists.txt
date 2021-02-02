@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.1)
 
+if (APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.12" CACHE STRING "Minimum OS X deployment version" FORCE)
+    message(STATUS "Minimum OS X deployment version: ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+endif ()
+
 ################################################################################
 
 get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
@@ -9,7 +14,7 @@ set (PROJECT_MAJOR 2)
 set (PROJECT_MINOR 4)
 set (PROJECT_PATCH 2)
 set (PROJECT_VERSION "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}")
-
+add_definitions("-DPROJECT_VERSION=\"${PROJECT_VERSION}\"")
 
 ################################################################################
 
@@ -29,8 +34,10 @@ endif()
 #message(STATUS "Easy3d: I'am woking on ${EASY3D_OS_BITS}-bit ${CMAKE_SYSTEM_NAME}")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(STATUS "Easy3D: I'am working on a 64-bit ${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DENV_64_BIT)
 else()
     message(STATUS "Easy3D: I'am working on a 32-bit ${CMAKE_SYSTEM_NAME}")
+    add_definitions(-DENV_32_BIT)
 endif()
 
 ################################################################################
@@ -54,6 +61,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # Build Qt-based examples/applications
 option(EASY3D_ENABLE_QT             "Build Qt-based examples/applications"  OFF)
+# Build application EasyDeploy (EASY3D_ENABLE_QT must be enabled first)
+option(EASY3D_BUILD_EASYDEPLOY      "Build application EasyDeploy"          OFF)
 # Build tutorials
 option(EASY3D_BUILD_TUTORIALS       "Build Easy3D Tutorials"                ON)
 # Build documentation
@@ -112,6 +121,9 @@ endif()
 # get a clean windows
 if (WIN32 OR MSVC)
     add_definitions(-DNOMINMAX)
+    if(MSVC)
+        add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    endif()
 endif()
 
 ################################################################################

@@ -137,6 +137,8 @@ typedef struct
     unsigned int                group_count;
     fastObjGroup*               groups;
 
+    // Liangliang: to record all errors occurred during file loading
+    char* error_msg;
 } fastObjMesh;
 
 #ifdef __cplusplus
@@ -200,6 +202,10 @@ typedef struct
     char*                       base;
 
 } fastObjData;
+
+
+// Liangliang: count the NaN coordinates
+int count_NaN = 0;
 
 
 static const
@@ -374,27 +380,6 @@ int string_equal(const char* a, const char* s, const char* e)
 
 
 static
-int string_find_last(const char* s, char c, size_t* p)
-{
-    const char* e;
-
-    e = s + strlen(s);
-    while (e > s)
-    {
-        e--;
-
-        if (*e == c)
-        {
-            *p = (size_t)(e - s);
-            return 1;
-        }
-    }
-
-    return 0;
-}
-
-
-static
 void string_fix_separators(char* s)
 {
     while (*s)
@@ -555,8 +540,11 @@ const char* parse_float(const char* ptr, float* val)
 
 
     num = 0.0;
-    while (is_digit(*ptr))
-        num = 10.0 * num + (double)(*ptr++ - '0');
+    bool has_value = false;
+    while (is_digit(*ptr)) {
+        num = 10.0 * num + (double) (*ptr++ - '0');
+        has_value = true;
+    }
 
     if (*ptr == '.')
         ptr++;
@@ -568,6 +556,7 @@ const char* parse_float(const char* ptr, float* val)
     {
         fra  = 10.0 * fra + (double)(*ptr++ - '0');
         div *= 10.0;
+        has_value = true;
     }
 
     num += fra / div;
@@ -594,13 +583,18 @@ const char* parse_float(const char* ptr, float* val)
         }
 
         eval = 0;
-        while (is_digit(*ptr))
+        while (is_digit(*ptr)) {
             eval = 10 * eval + (*ptr++ - '0');
+            has_value = true;
+        }
 
         num *= (eval >= MAX_POWER) ? 0.0 : powers[eval];
     }
 
     *val = (float)(sign * num);
+
+    if (!has_value)
+        ++count_NaN;
 
     return ptr;
 }
@@ -1281,6 +1275,8 @@ void fast_obj_destroy(fastObjMesh* m)
 
 fastObjMesh* fast_obj_read(const char* path)
 {
+    count_NaN = 0;
+
     fastObjData  data;
     fastObjMesh* m;
     void*        file;
@@ -1289,7 +1285,6 @@ fastObjMesh* fast_obj_read(const char* path)
     char*        end;
     char*        last;
     fastObjUInt  read;
-    size_t       sep;
     fastObjUInt  bytes;
 
 
@@ -1336,13 +1331,16 @@ fastObjMesh* fast_obj_read(const char* path)
 
 
     /* Find base path for materials/textures */
-    if (string_find_last(path, FAST_OBJ_SEPARATOR, &sep))
-        data.base = string_substr(path, 0, sep + 1);
-#ifdef _WIN32
-    /* Check for the other direction slash on windows too, but not linux/mac where it's a valid char */
-    else if (string_find_last(path, FAST_OBJ_OTHER_SEP, &sep))
-        data.base = string_substr(path, 0, sep + 1);
-#endif
+    {
+        const char* sep1 = strrchr(path, FAST_OBJ_SEPARATOR);
+        const char* sep2 = strrchr(path, FAST_OBJ_OTHER_SEP);
+
+        /* Use the last separator in the path */
+        const char* sep = sep2 && (!sep1 || sep1 < sep2) ? sep2 : sep1;
+
+        if (sep)
+            data.base = string_substr(path, 0, sep - path + 1);
+    }
 
 
     /* Create buffer for reading file */
@@ -1416,6 +1414,13 @@ fastObjMesh* fast_obj_read(const char* path)
     memory_dealloc(data.base);
 
     file_close(file);
+
+    if (count_NaN > 0) {
+        std::string error = "file contains " + std::to_string(count_NaN) + " NaN coordinates (changed to zeros)";
+        m->error_msg = (char *) error.c_str();
+    }
+    else
+        m->error_msg = nullptr;
 
     return m;
 }

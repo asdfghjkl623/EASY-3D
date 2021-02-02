@@ -297,7 +297,7 @@ void PaintCanvas::mousePressEvent(QMouseEvent *e) {
                 LOG(WARNING) << "Alt + Left click is for the walking mode only. Press 'K' to add a keyframe in the free mode";
             }
         } else {
-            if (e->button() == Qt::LeftButton)
+            if (e->button() == Qt::LeftButton && e->modifiers() != Qt::AltModifier && e->modifiers() != Qt::ControlModifier)
                 show_manip_sphere_ = true;
 
             if (e->modifiers() == Qt::NoModifier && e->button() == Qt::LeftButton &&
@@ -468,6 +468,9 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
 
     mouse_current_pos_ = e->pos();
     QOpenGLWidget::mouseMoveEvent(e);
+
+    if (pressed_button_ == Qt::LeftButton && modifiers_ == Qt::ControlModifier) // zoom on region
+        update();
 }
 
 
@@ -850,22 +853,47 @@ void PaintCanvas::fitScreen(const easy3d::Model *model) {
     if (!model && models_.empty())
         return;
 
-    Box3 box;
-    if (model && model->renderer()->is_visible())
-        box = model->bounding_box(true);
-    else {
-        for (auto m : models_) {
-            if (m->renderer()->is_visible())
-            box.add_box(m->bounding_box(true));
-        }
+    Box3 box_models;   // everything within box_models should be visible
+    for (auto m : models_) {
+        if (m->renderer()->is_visible())
+            box_models.add_box(m->bounding_box(false));
     }
 
-    if (box.is_valid()) {
-        camera_->setSceneBoundingBox(box.min_point(), box.max_point());
-        camera_->showEntireScene();
-        adjustSceneRadius();
-        update();
-    }
+    Box3 box_scene = box_models;   // everything within box_scene should be visible
+    const int count = walkThrough()->interpolator()->number_of_keyframes();
+    for (int i = 0; i < count; ++i)
+        box_scene.add_point(walkThrough()->interpolator()->keyframe(i).position());
+
+    Box3 box;// this box will be fitted to the screen
+    if (model && model->renderer()->is_visible())
+        box = model->bounding_box(false);
+    else
+        box = box_models;
+
+    if (!box.is_valid())
+        return;
+
+    // the proper scene radius (ensure everything within it will be visible) should be max of all distances from box's
+    // center to all the vertices of box_scene
+    float radius = box.radius();
+    const std::vector<vec3> vts = {
+            vec3(box_scene.min_coord(0), box_scene.min_coord(1), box_scene.min_coord(2)), // 0
+            vec3(box_scene.max_coord(0), box_scene.min_coord(1), box_scene.min_coord(2)), // 1
+            vec3(box_scene.max_coord(0), box_scene.max_coord(1), box_scene.min_coord(2)), // 2
+            vec3(box_scene.min_coord(0), box_scene.max_coord(1), box_scene.min_coord(2)), // 3
+            vec3(box_scene.min_coord(0), box_scene.min_coord(1), box_scene.max_coord(2)), // 4
+            vec3(box_scene.max_coord(0), box_scene.min_coord(1), box_scene.max_coord(2)), // 5
+            vec3(box_scene.max_coord(0), box_scene.max_coord(1), box_scene.max_coord(2)), // 6
+            vec3(box_scene.min_coord(0), box_scene.max_coord(1), box_scene.max_coord(2)), // 7
+    };
+    for (const auto &p : vts)
+        radius = std::max(radius, distance(box.center(), p));
+
+    camera_->setSceneCenter(box.center());
+    // make it a little bigger to ensure tiny objects (far away from other big objects) are also visible
+    camera_->setSceneRadius(radius);
+    camera_->fitBoundingBox(box.min_point(), box.max_point());
+    update();
 }
 
 
@@ -1132,12 +1160,13 @@ void PaintCanvas::postDraw() {
         }
 
 #if 0   // draw frame rate text using Easy3D's built-in TextRenderer
-        texter_->draw(fpsString.toStdString(), offset, 50.0f * dpi_scaling(), 16, 1);
+        texter_->draw(fpsString.toStdString(), 20.0f * dpi_scaling(), 50.0f * dpi_scaling(), 16, 1);
 #else   // draw frame rate text using Qt.
         QPainter painter; easy3d_debug_log_gl_error;
         painter.begin(this);
         painter.setRenderHint(QPainter::HighQualityAntialiasing);
         painter.setRenderHint(QPainter::TextAntialiasing);
+        painter.setPen(Qt::black);
         painter.beginNativePainting(); easy3d_debug_log_gl_error;
         painter.drawText(20, 50, fpsString);
         painter.endNativePainting();

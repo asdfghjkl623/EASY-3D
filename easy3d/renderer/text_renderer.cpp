@@ -335,7 +335,10 @@ namespace easy3d {
             scale = stash->dpiScale * stbtt_ScaleForPixelHeight(&fnt->font, size);
             g = stbtt_FindGlyphIndex(&fnt->font, codepoint);
             if (!g) {
-//                LOG(WARNING) << "given font does not support character " << string::to_string({wchar_t(codepoint)});
+//                if (codepoint != '\n')
+//                    LOG_FIRST_N(3, WARNING) << "given font does not support character '" << string::from_wstring({wchar_t(codepoint)}) << "'. " << COUNTER;
+//                else
+//                    LOG_FIRST_N(3, WARNING) << "current implementation ignores new line character '\\n'. " << COUNTER;
                 return 0;
             }
             stbtt_GetGlyphHMetrics(&fnt->font, g, &advance, &lsb);
@@ -384,8 +387,8 @@ namespace easy3d {
                                     tex = tex->next;
                                 }
 
-                                LOG(INFO) << "allocating a new texture of " << stash->tw << " x " << stash->th << " ("
-                                          << numTex << " used so far)";
+                                VLOG(1) << "allocating a new texture of " << stash->tw << " x " << stash->th << " ("
+                                        << numTex << " used so far)";
                                 glGenTextures(1, &texture->id);
                                 if (!texture->id) goto error;
                                 glBindTexture(GL_TEXTURE_2D, texture->id);
@@ -750,7 +753,7 @@ namespace easy3d {
         font_ids_.push_back(id);
         const std::string simple_name = file_system::simple_name(font_file);
         font_names_.push_back(simple_name);
-//        LOG(INFO) << "loaded font '" << simple_name << "' in texture (" << texture_size_ << " x " << texture_size_ << ")";
+        VLOG(1) << "loaded font '" << simple_name << "' in texture (" << texture_size_ << " x " << texture_size_ << ")";
         return true;
     }
 

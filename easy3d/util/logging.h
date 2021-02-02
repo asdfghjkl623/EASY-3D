@@ -36,6 +36,10 @@
 #define LOG_IF_EVERY_N(n, condition, LEVEL)  if (condition) \
     CLOG_EVERY_N(n, LEVEL, ELPP_CURR_FILE_LOGGER_ID)
 
+// to have LOG_IF_FIRST_N
+#define LOG_IF_FIRST_N(n, condition, LEVEL)  if (condition) \
+CLOG_N_TIMES(n, LEVEL, ELPP_CURR_FILE_LOGGER_ID)
+
 // for logging the counter number
 #define COUNTER     ELPP_COUNTER->hitCounts()
 
@@ -48,18 +52,21 @@ namespace easy3d {
 
         /**
          * @brief Initializes the logging module.
-         * @param info_to_stderr \c ture to log messages at a the INFO level to stderr.
-         *      \c false only log at WARNING, ERROR, FATAL levels to stderr.
-         * @param verbose_level A value in the range [0, 9] for VLOG that will be written into the log file.
+         * @param info_to_stderr \c ture to log messages at a the INFO level to stderr. \c false only log at WARNING,
+         *      ERROR, FATAL levels to stderr.
          * @param log_file A string specifying the full path to the log file.
          *      If \p log_file is a valid path: log messages will be written to this file in addition to stderr.
          *      If \p log_file is empty: no log file will be created.
-         *      If \p log_file is "default": creat a log file with a title in the form "ApplicationName.log" in a
-         *          directory "logs" next to the executable file.
+         *      If \p log_file is "default": creat a log file with a title in the form "ApplicationName.log" next to
+         *      the executable file.
+         * @param verbosity_threshold A \c VLOG(level) with \c level <= \c verbosity_threshold will be written into the
+         *      log file (if specified). Value must be in the range [0, 9]. Default is 0 (
          * @note This initialization is optional. If not called, log messages will be written to stderr only.
          */
-        void initialize(bool info_to_stderr = false, int verbose_level = 0, const std::string &log_file = "");
+        void initialize(bool info_to_stderr = false, const std::string &log_file = "", int verbosity_threshold = 0);
 
+        /// Returns the full path of the log file (empty if no log file has been created).
+        std::string log_file();
 
         /// Base class for a logger (that can log messages to whatever)
         /// Users should subclass Logger and override send() to do whatever they want.

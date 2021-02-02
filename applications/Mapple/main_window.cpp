@@ -62,7 +62,6 @@
 #include <easy3d/fileio/poly_mesh_io.h>
 #include <easy3d/fileio/ply_reader_writer.h>
 #include <easy3d/fileio/point_cloud_io_ptx.h>
-#include <easy3d/fileio/resources.h>
 #include <easy3d/algo/point_cloud_normals.h>
 #include <easy3d/algo/surface_mesh_components.h>
 #include <easy3d/algo/surface_mesh_topology.h>
@@ -230,20 +229,18 @@ void MainWindow::send(el::Level level, const std::string &msg) {
 	switch (level) {
         case el::Level::Info:
             ui->listWidgetLog->addItem(QString::fromStdString("[INFO] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::black);
+            // set to black will not work if it is dark mode
+//            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::black);
             break;
         case el::Level::Warning:
             ui->listWidgetLog->addItem(QString::fromStdString("[WARNING] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::blue);
+            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkRed);
             break;
         case el::Level::Error:
             ui->listWidgetLog->addItem(QString::fromStdString("[ERROR] " + msg));
             ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::red);
             break;
-        case el::Level::Fatal:
-            ui->listWidgetLog->addItem(QString::fromStdString("[FATAL] " + msg));
-            ui->listWidgetLog->item(ui->listWidgetLog->count() - 1)->setForeground(Qt::darkRed);
-            break;
+        case el::Level::Fatal:  // no need to handle (app will crash)
         default: break;
     }
 
@@ -255,18 +252,18 @@ void MainWindow::send(el::Level level, const std::string &msg) {
 void MainWindow::createStatusBar()
 {
     labelStatusInfo_ = new QLabel("Ready", this);
-    labelStatusInfo_->setFixedWidth(ui->dockWidgetRendering->width());
+    labelStatusInfo_->setFixedWidth(static_cast<int>(ui->dockWidgetRendering->width() * 0.7f));
     labelStatusInfo_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     statusBar()->addWidget(labelStatusInfo_);
 
     labelPointUnderMouse_ = new QLabel(this);
-    labelPointUnderMouse_->setFixedWidth(400);
+    labelPointUnderMouse_->setFixedWidth(300);
     labelPointUnderMouse_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     statusBar()->addWidget(labelPointUnderMouse_);
 
     //////////////////////////////////////////////////////////////////////////
 
-    const int length = 120;
+    const int length = 100;
     labelNumFaces_ = new QLabel(this);
     labelNumFaces_->setMinimumWidth(length);
     labelNumFaces_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -300,7 +297,7 @@ void MainWindow::createStatusBar()
     progress_bar_ = new QProgressBar(this);
     progress_bar_->setVisible(false);
     progress_bar_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    progress_bar_->setMinimumWidth(ui->dockWidgetModels->sizeHint().width());
+    progress_bar_->setFixedWidth(ui->dockWidgetModels->width());
     statusBar()->addPermanentWidget(progress_bar_);
 
     //////////////////////////////////////////////////////////////////////////
@@ -316,9 +313,9 @@ void MainWindow::updateStatusBar()
     Model* model = viewer_->currentModel();
     if (dynamic_cast<SurfaceMesh*>(model)) {
         auto mesh = dynamic_cast<SurfaceMesh*>(model);
-        faces = QString("#faces: %1").arg(mesh->n_faces());
-        vertices = QString("#vertices: %1").arg(mesh->n_vertices());
-        edges = QString("#edges: %1").arg(mesh->n_edges());
+        faces = QString("#faces: %1  ").arg(mesh->n_faces());
+        vertices = QString("#vertices: %1  ").arg(mesh->n_vertices());
+        edges = QString("#edges: %1  ").arg(mesh->n_edges());
         labelNumFaces_->setVisible(true);
         labelNumEdges_->setVisible(true);
         labelNumCells_->setVisible(false);
@@ -326,7 +323,7 @@ void MainWindow::updateStatusBar()
 
     else if (dynamic_cast<PointCloud*>(model)) {
         auto cloud = dynamic_cast<PointCloud*>(model);
-        vertices = QString("#vertices: %1").arg(cloud->n_vertices());
+        vertices = QString("#vertices: %1  ").arg(cloud->n_vertices());
         labelNumFaces_->setVisible(false);
         labelNumEdges_->setVisible(false);
         labelNumCells_->setVisible(false);
@@ -334,8 +331,8 @@ void MainWindow::updateStatusBar()
 
     else if (dynamic_cast<Graph*>(model)) {
         auto graph = dynamic_cast<Graph*>(model);
-        vertices = QString("#vertices: %1").arg(graph->n_vertices());
-        edges = QString("#edges: %1").arg(graph->n_edges());
+        vertices = QString("#vertices: %1  ").arg(graph->n_vertices());
+        edges = QString("#edges: %1  ").arg(graph->n_edges());
         labelNumFaces_->setVisible(false);
         labelNumEdges_->setVisible(true);
         labelNumCells_->setVisible(false);
@@ -343,10 +340,10 @@ void MainWindow::updateStatusBar()
 
     else if (dynamic_cast<PolyMesh*>(model)) {
         auto mesh = dynamic_cast<PolyMesh*>(model);
-        faces = QString("#faces: %1").arg(mesh->n_faces());
-        vertices = QString("#vertices: %1").arg(mesh->n_vertices());
-        edges = QString("#edges: %1").arg(mesh->n_edges());
-        cells = QString("#cells: %1").arg(mesh->n_cells());
+        faces = QString("#faces: %1  ").arg(mesh->n_faces());
+        vertices = QString("#vertices: %1  ").arg(mesh->n_vertices());
+        edges = QString("#edges: %1  ").arg(mesh->n_edges());
+        cells = QString("#cells: %1  ").arg(mesh->n_cells());
         labelNumFaces_->setVisible(true);
         labelNumEdges_->setVisible(true);
         labelNumCells_->setVisible(true);
@@ -392,6 +389,25 @@ void MainWindow::dropEvent(QDropEvent *e) {
 }
 
 
+int MainWindow::openFiles(const QStringList &fileNames) {
+    int count = 0;
+    ProgressLogger progress(fileNames.size(), true, false);
+    for (const auto& name : fileNames) {
+        if (progress.is_canceled()) {
+            LOG(WARNING) << "opening files cancelled";
+            break;
+        }
+        if (open(name.toStdString()))
+            ++count;
+        progress.next();
+    }
+    if (count > 0)
+        viewer()->fitScreen();
+
+    return count > 0;
+}
+
+
 bool MainWindow::onOpen() {
     const QStringList& fileNames = QFileDialog::getOpenFileNames(
                 this,
@@ -410,21 +426,7 @@ bool MainWindow::onOpen() {
     if (fileNames.empty())
         return false;
 
-    int count = 0;
-	ProgressLogger progress(fileNames.size(), true, false);
-    for (const auto& name : fileNames) {
-        if (progress.is_canceled()) {
-            LOG(WARNING) << "opening files cancelled";
-            break;
-        }
-        if (open(name.toStdString()))
-            ++count;
-        progress.next();
-    }
-    if (count > 0)
-        viewer()->fitScreen();
-
-    return count > 0;
+    return openFiles(fileNames);
 }
 
 
@@ -733,25 +735,26 @@ void MainWindow::onAbout()
         "<p align=\"center\"><span style=\"font-style:italic;\">I'm good software, though I have defects.</span></p>"
         );
 
+    int bits = 64;
 #if defined (ENV_32_BIT)
-    title += QMessageBox::tr("<h3>Mapple (32-bit)</h3>");
-#elif defined (ENV_64_BIT)
-    title += QMessageBox::tr("<h3>Mapple (64-bit)</h3>");
-#else
-    title += QMessageBox::tr("<h3>Mapple</h3>");
+    bits = 32;
 #endif
 
 #ifndef NDEBUG
-    title += QMessageBox::tr(" (Debug Version)");
+    title += QMessageBox::tr("<h3>Mapple (%1 bit) - Debug Version</h3>").arg(bits);
+#else
+    title += QMessageBox::tr("<h3>Mapple (%1 bit)</h3>").arg(bits);
 #endif
 
+    title += QMessageBox::tr("<h4>Version %1</h4>").arg(PROJECT_VERSION);
+
     QString text = QMessageBox::tr(
-        "<p><h4> Build %1</h4></p>"
-        "<p>Mapple is software for processing and rendering point clouds, graphs, surface meshes, and polyhedral meshes.</p>"
-        "<p>Liangliang Nan<br>"
-        "<a href=\"mailto:liangliang.nan@gmail.com\">liangliang.nan@gmail.com</a><br>"
-        "<a href=\"https://3d.bk.tudelft.nl/liangliang/\">https://3d.bk.tudelft.nl/liangliang/</a></p>"
-        ).arg("20201226");
+            "<p>Mapple is software for processing and rendering 3D data (e.g., point clouds, graphs, surface meshes, "
+            "and polyhedral meshes), and more.</p>"
+            "<p>Liangliang Nan<br>"
+            "<a href=\"mailto:liangliang.nan@gmail.com\">liangliang.nan@gmail.com</a><br>"
+            "<a href=\"https://3d.bk.tudelft.nl/liangliang/\">https://3d.bk.tudelft.nl/liangliang/</a></p>"
+    );
 
     //QMessageBox::about(this, title, text);
     QMessageBox::about(this, "About Mapple", title + text);
@@ -870,6 +873,9 @@ void MainWindow::createActionsForViewMenu() {
     connect(ui->actionShowFrameRate, SIGNAL(toggled(bool)), viewer_, SLOT(showFrameRate(bool)));
     connect(ui->actionShowAxes, SIGNAL(toggled(bool)), viewer_, SLOT(showAxes(bool)));
 
+    connect(ui->actionShowCameraPath, SIGNAL(toggled(bool)), this, SLOT(setShowCameraPath(bool)));
+    connect(ui->actionShowKeyframeCameras, SIGNAL(toggled(bool)), this, SLOT(setShowKeyframeCameras(bool)));
+
     QAction* actionToggleDockWidgetRendering = ui->dockWidgetRendering->toggleViewAction();
     actionToggleDockWidgetRendering->setText("Rendering Panel");
     ui->menuView->addAction(actionToggleDockWidgetRendering);
@@ -899,8 +905,6 @@ void MainWindow::createActionsForCameraMenu() {
 
     connect(ui->actionImportCameraPath, SIGNAL(triggered()), this, SLOT(importCameraPath()));
     connect(ui->actionExportCameraPath, SIGNAL(triggered()), this, SLOT(exportCameraPath()));
-    connect(ui->actionShowCameraPath, SIGNAL(toggled(bool)), this, SLOT(setShowCameraPath(bool)));
-    connect(ui->actionShowCameras, SIGNAL(toggled(bool)), this, SLOT(setShowCameras(bool)));
     connect(ui->actionAnimation, SIGNAL(triggered()), this, SLOT(animation()));
 }
 
@@ -2057,7 +2061,7 @@ void MainWindow::setShowCameraPath(bool b) {
 }
 
 
-void MainWindow::setShowCameras(bool b) {
+void MainWindow::setShowKeyframeCameras(bool b) {
     viewer_->walkThrough()->set_cameras_visible(b);
     viewer_->adjustSceneRadius();
     viewer_->update();

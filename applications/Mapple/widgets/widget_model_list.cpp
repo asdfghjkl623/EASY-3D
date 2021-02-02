@@ -10,6 +10,7 @@
 #include <easy3d/core/surface_mesh_builder.h>
 #include <easy3d/algo/surface_mesh_components.h>
 #include <easy3d/renderer/renderer.h>
+#include <easy3d/renderer/manipulator.h>
 #include <easy3d/renderer/drawable_points.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_triangles.h>
@@ -160,6 +161,22 @@ void WidgetModelList::updateDrawableVisibility(easy3d::Drawable *d) {
 }
 
 
+void WidgetModelList::updateVisibilities() {
+    int num = topLevelItemCount();
+    for (int i = 0; i < num; ++i) {
+        auto item = dynamic_cast<ModelItem *>(topLevelItem(i));
+        bool visible = item->model()->renderer()->is_visible();
+        item->setVisible(2, visible);
+        item->highlight(item->model() == viewer()->currentModel());
+        int num_children = item->childCount();
+        for (int j = 0; j < num_children; ++j) {
+            auto d_item = dynamic_cast<DrawableItem *>(item->child(j));
+            d_item->setVisible(2, d_item->drawable()->is_visible());
+        }
+    }
+}
+
+
 void WidgetModelList::updateDrawableVisibilities() {
     int num = topLevelItemCount();
     for (int i = 0; i < num; ++i) {
@@ -277,6 +294,11 @@ void WidgetModelList::updateModelList() {
     // clear everything and creat the list from scratch
     clear();
 
+    if (selected_only_) {
+        for (auto m : viewer()->models())
+            m->renderer()->set_visible(m == viewer()->currentModel());
+    }
+
     const std::vector<Model *> &models = viewer()->models();
     for (unsigned int i = 0; i < models.size(); ++i) {
         Model *model = models[i];
@@ -347,28 +369,6 @@ void WidgetModelList::duplicateCurrent() {
             viewer()->addModel(copy);
             addModel(copy, true);
         }
-    }
-}
-
-
-void WidgetModelList::hideOtherModels(Model *cur) {
-    int num = topLevelItemCount();
-    for (int i=0; i<num; ++i) {
-        auto item = dynamic_cast<ModelItem*>(topLevelItem(i));
-        if (!item)
-            continue;
-        Model *model = item->model();
-        if (!model)
-            continue;
-        if (selected_only_ && model != cur) {
-            model->renderer()->set_visible(false);
-            item->setVisible(2, false);
-        }
-        else {
-            model->renderer()->set_visible(true);
-            item->setVisible(2, true);
-        }
-        item->highlight(model == viewer()->currentModel());
     }
 }
 
@@ -493,16 +493,18 @@ void WidgetModelList::deleteSelected() {
             viewer()->deleteModel(item->model());
 	}
 
-    updateModelList();
-
 	Model* current_model = viewer()->currentModel();
-	if (selected_only_)
-		hideOtherModels(current_model);
+	if (selected_only_) {
+	    for (auto m : viewer()->models())
+	        m->renderer()->set_visible(m == current_model);
+	}
+
+    updateModelList();
 
 	if (auto_focus_)
 		viewer()->fitScreen();
-	else
-		viewer()->update();
+
+	viewer()->update();
 
     mainWindow_->updateRenderingPanel();
     mainWindow_->updateWindowTitle();
@@ -522,13 +524,17 @@ void WidgetModelList::currentModelItemChanged(QTreeWidgetItem *current, QTreeWid
 	Model* model = current_item->model();
 	viewer()->setCurrentModel(model);
 
-	if (selected_only_)
-		hideOtherModels(model);
+    if (selected_only_) {
+        for (auto m : viewer()->models())
+            m->renderer()->set_visible(m == model);
+    }
+    updateVisibilities();
+
 
     if (auto_focus_)
         viewer()->fitScreen(model);
-    else
-        viewer()->update();
+
+    viewer()->update();
 
     mainWindow_->updateRenderingPanel();
     mainWindow_->updateWindowTitle();
@@ -552,12 +558,13 @@ void WidgetModelList::modelItemSelectionChanged() {
 
 
 void WidgetModelList::modelItemPressed(QTreeWidgetItem *current, int column) {
+    Model* prev_active_model = viewer()->currentModel();
+
     Model* active_model = nullptr;
     if (dynamic_cast<ModelItem *>(current)) {
         ModelItem *current_item = dynamic_cast<ModelItem *>(current);
-        viewer()->setCurrentModel(current_item->model());
         active_model = current_item->model();
-
+        viewer()->setCurrentModel(active_model);
         if (column == 2 && !selected_only_) {
             Model *model = current_item->model();
             bool visible = !model->renderer()->is_visible();
@@ -578,20 +585,17 @@ void WidgetModelList::modelItemPressed(QTreeWidgetItem *current, int column) {
     }
 
     viewer()->setCurrentModel(active_model);
-    if (selected_only_)
-        hideOtherModels(active_model);
-    else {
-        int num = topLevelItemCount();
-        for (int i = 0; i < num; ++i) {
-            ModelItem *item = dynamic_cast<ModelItem *>(topLevelItem(i));
-            item->highlight(item->model() == viewer()->currentModel());
+    if (selected_only_) {
+        for (auto m : viewer()->models()) {
+            m->renderer()->set_visible(m == active_model);
         }
     }
+    updateVisibilities();
 
-    if (auto_focus_)
+    if (auto_focus_ && active_model != prev_active_model)
         viewer()->fitScreen(active_model);
-    else
-        viewer()->update();
+
+    viewer()->update();
 
     mainWindow_->updateRenderingPanel();
     mainWindow_->updateWindowTitle();
@@ -613,13 +617,14 @@ void WidgetModelList::setAutoFocus(bool b) {
     auto_focus_ = b;
     if (auto_focus_)
         viewer()->fitScreen(viewer()->currentModel());
-    else
-        viewer()->update();
+
+    viewer()->update();
 }
 
 
 void WidgetModelList::setSelectedOnly(bool b) {
 	selected_only_ = b;
+
 	if (selected_only_) {
         setSelectionMode(QAbstractItemView::SingleSelection);
         connect(this, SIGNAL(currentItemChanged(QTreeWidgetItem * , QTreeWidgetItem * )), this,
@@ -631,21 +636,20 @@ void WidgetModelList::setSelectedOnly(bool b) {
                 SLOT(currentModelItemChanged(QTreeWidgetItem * , QTreeWidgetItem * )));
     }
 
-	ModelItem* item = dynamic_cast<ModelItem*>(currentItem());
-	if (!item)
-		return;
-
-	Model* active_model = item->model();
-	if (selected_only_)
-		hideOtherModels(active_model);
+	Model* active_model = viewer()->currentModel();
+    if (selected_only_) {
+        for (auto m : viewer()->models()) {
+            m->renderer()->set_visible(m == active_model);
+        }
+    }
 	else {
 		const std::vector<Model*>& models = viewer()->models();
 		for (int i = 0; i < models.size(); ++i) {
 			models[i]->renderer()->set_visible(true);
 		}
 	}
+    updateVisibilities();
 
-    updateModelList();
     viewer()->update();
 }
 
@@ -660,8 +664,11 @@ void WidgetModelList::addModel(Model *model, bool make_current) {
     }
 
     Model *current_model = viewer()->currentModel();
-    if (selected_only_)
-        hideOtherModels(current_model);
+    if (selected_only_) {
+        for (auto m : viewer()->models()) {
+            m->renderer()->set_visible(m == current_model);
+        }
+    }
 
     updateModelList();
     mainWindow_->updateRenderingPanel();
@@ -704,6 +711,7 @@ void WidgetModelList::mergeModels(const std::vector<Model *> &models) {
 
 		to->set_name("merged_mesh");
 		to->renderer()->update();
+		to->manipulator()->reset();
 	}
 
 	if (clouds.size() > 1) {
