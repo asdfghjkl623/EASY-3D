@@ -28,6 +28,7 @@
 #include <cstring> //for strcmp
 
 #include <easy3d/core/poly_mesh.h>
+#include <easy3d/util/progress.h>
 
 
 namespace easy3d {
@@ -46,23 +47,31 @@ namespace easy3d {
                 return false;
             }
 
+            // get length of file
+            fseek(mesh_file, 0L, SEEK_END); // seek to end of file
+            long size = ftell(mesh_file);
+            fseek(mesh_file, 0L, SEEK_SET); // seek back to beginning of file
+
+            ProgressLogger progress(size, true, false);
+
 #ifndef LINE_MAX
 #  define LINE_MAX 2048
 #endif
 
-            // eat comments at beginning of file
-            const auto eat_comments = [](FILE *file, char* a_line) -> bool {
+            // get the next line (ignoring comments and empty lines)
+            const auto get_next_line = [](FILE *file, char* a_line) -> bool {
                 bool still_comments = true;
                 bool has_line = false;
                 while (still_comments && !feof(file)) {
                     has_line = fgets(a_line, LINE_MAX, file) != NULL;
-                    still_comments = (a_line[0] == '#' || a_line[0] == '\n');
+                    // needs to check for both line feed (LF: '\n') or Carriage return (CR: '\r')
+                    still_comments = (a_line[0] == ' ' || a_line[0] == '#' || a_line[0] == '\n' || a_line[0] == '\r');
                 }
                 return has_line;
             };
 
             char line[LINE_MAX];
-            eat_comments(mesh_file, line);
+            get_next_line(mesh_file, line);
 
             char str[LINE_MAX];
             sscanf(line, " %s", str);
@@ -81,9 +90,10 @@ namespace easy3d {
                 return false;
             }
 
+            std::set<std::string> ignored_entries;
+
             std::vector<PolyMesh::Vertex> vertices;
-//            std::vector<PolyMesh::HalfFace> faces; // PolyMesh adds the faces when adding the tetrahedra
-            while (eat_comments(mesh_file, line)) {
+            while (get_next_line(mesh_file, line)) {
                 sscanf(line, " %s", str);
                 int extra;
                 // check that third word is Dimension
@@ -100,11 +110,17 @@ namespace easy3d {
                     }
                 } else if (0 == strcmp(str, "Vertices")) {
                     int number_of_vertices(0);
-                    if (1 != fscanf(mesh_file, " %d", &number_of_vertices) || number_of_vertices > 1000000000) {
-                        LOG(ERROR) << "expecting number of vertices should be less than 10^9...";
-                        fclose(mesh_file);
-                        return false;
+                    if (2 != sscanf(line, "%s %d", str, &number_of_vertices)) {
+                        // number_of_vertices appears on next line?
+                        if (1 != fscanf(mesh_file, " %d", &number_of_vertices) || number_of_vertices > 1000000000) {
+                            LOG(ERROR) << "expecting number of vertices should be less than 10^9...";
+                            fclose(mesh_file);
+                            return false;
+                        }
                     }
+
+                    LOG(INFO) << "reading " << number_of_vertices << " vertices...";
+
                     // allocate space for vertices
                     vertices.resize(number_of_vertices);
                     for (int i = 0; i < number_of_vertices; i++) {
@@ -115,75 +131,115 @@ namespace easy3d {
                             return false;
                         }
                         vertices[i] = mesh->add_vertex(vec3(x, y, z));
-                    }
-                } else if (0 == strcmp(str, "Triangles")) {
-                    int number_of_triangles(0);
-                    if (1 != fscanf(mesh_file, " %d", &number_of_triangles)) {
-                        LOG(ERROR) << "expecting number of triangles...";
-                        fclose(mesh_file);
-                        return false;
-                    }
-
-//                    faces.resize(number_of_triangles);
-                    int tri[3]; // triangle indices
-                    for (int i = 0; i < number_of_triangles; i++) {
-                        if (4 != fscanf(mesh_file, " %d %d %d %d", &tri[0], &tri[1], &tri[2], &extra)) {
-                            LOG(ERROR) << "expecting triangle indices...";
-                            return false;
-                        }
-//                        faces[i] = mesh->add_triangle(
-//                                PolyMesh::Vertex(tri[0] - 1),
-//                                PolyMesh::Vertex(tri[1] - 1),
-//                                PolyMesh::Vertex(tri[2] - 1)
-//                        );
+                        progress.notify(ftell(mesh_file));
                     }
                 } else if (0 == strcmp(str, "Tetrahedra")) {
                     int number_of_tetrahedra(0);
-                    if (1 != fscanf(mesh_file, " %d", &number_of_tetrahedra)) {
-                        LOG(ERROR) << "expecting number of tetrahedra...";
-                        fclose(mesh_file);
-                        return false;
+                    if (2 != sscanf(line, "%s %d", str, &number_of_tetrahedra)) {
+                        // number_of_tetrahedra appears on next line?
+                        if (1 != fscanf(mesh_file, " %d", &number_of_tetrahedra) || number_of_tetrahedra > 1000000000) {
+                            LOG(ERROR) << "expecting number of tetrahedra should be less than 10^9...";
+                            fclose(mesh_file);
+                            return false;
+                        }
                     }
 
+                    LOG(INFO) << "reading " << number_of_tetrahedra << " tetrahedra...";
+
                     // tet indices
-                    int a, b, c, d;
+                    int indices[4];
                     for (int i = 0; i < number_of_tetrahedra; i++) {
-                        if (5 != fscanf(mesh_file, " %d %d %d %d %d", &a, &b, &c, &d, &extra)) {
+                        if (5 != fscanf(mesh_file, " %d %d %d %d %d",
+                                        &indices[0], &indices[1], &indices[2], &indices[3], &extra))
+                        {
                             LOG(ERROR) << "expecting tetrahedra indices...";
                             fclose(mesh_file);
                             return false;
                         }
-                        mesh->add_tetra(vertices[a - 1], vertices[b - 1], vertices[c - 1], vertices[d - 1]);
+                        mesh->add_tetra(
+                                vertices[indices[0] - 1],
+                                vertices[indices[1] - 1],
+                                vertices[indices[2] - 1],
+                                vertices[indices[3] - 1]
+                        );
+                        progress.notify(ftell(mesh_file));
                     }
-                } else if (0 == strcmp(str, "Edges")) {
-                    int number_of_edges;
-                    if (1 != fscanf(mesh_file, " %d", &number_of_edges)) {
-                        LOG(ERROR) << "expecting number of edges...";
-                        fclose(mesh_file);
-                        return false;
-                    }
-                    // allocate space for edges
-                    std::vector<std::pair<int, int> > edges(number_of_edges);
-                    // tet indices
-                    int a, b;
-                    for (int i = 0; i < number_of_edges; i++) {
-                        if (3 != fscanf(mesh_file, " %d %d %d", &a, &b, &extra)) {
-                            LOG(ERROR) << "expecting tetrahedra indices...";
+                } else if (0 == strcmp(str, "Hexahedra")) {
+                    int number_of_hexahedra(0);
+                    if (2 != sscanf(line, "%s %d", str, &number_of_hexahedra)) {
+                        // number_of_hexahedra appears on next line?
+                        if (1 != fscanf(mesh_file, " %d", &number_of_hexahedra) || number_of_hexahedra > 1000000000) {
+                            LOG(ERROR) << "expecting number of hexahedra should be less than 10^9...";
                             fclose(mesh_file);
                             return false;
                         }
-                        edges[i] = {a - 1, b - 1};
                     }
+
+                    LOG(INFO) << "reading " << number_of_hexahedra << " hexahedra...";
+
+                    // hex indices
+                    int indices[8];
+                    for (int i = 0; i < number_of_hexahedra; i++) {
+                        if (9 != fscanf(mesh_file, " %d %d %d %d %d %d %d %d %d",
+                                        &indices[0], &indices[1], &indices[2], &indices[3],
+                                        &indices[4], &indices[5], &indices[6], &indices[7], &extra))
+                        {
+                            LOG(ERROR) << "expecting hexahedra indices...";
+                            fclose(mesh_file);
+                            return false;
+                        }
+                        mesh->add_hexa(
+                                vertices[indices[0] - 1],
+                                vertices[indices[1] - 1],
+                                vertices[indices[2] - 1],
+                                vertices[indices[3] - 1],
+                                vertices[indices[4] - 1],
+                                vertices[indices[5] - 1],
+                                vertices[indices[6] - 1],
+                                vertices[indices[7] - 1]
+                        );
+                        progress.notify(ftell(mesh_file));
+                    };
                 } else if (0 == strcmp(str, "End")) {
                     break;
                 } else {
-                    LOG(ERROR) << "expecting Dimension|Triangles|Vertices|Tetrahedra|Edges instead of " << str;
-                    fclose(mesh_file);
-                    return false;
+                    ignored_entries.insert(str);
+
+                    // we still need to move the stream forward
+                    int number_of_entries(0);
+                    if (2 != sscanf(line, "%s %d", str, &number_of_entries)) {
+                        // number_of_entries appears on next line?
+                        if (1 != fscanf(mesh_file, " %d", &number_of_entries) || number_of_entries > 1000000000) {
+                            LOG(ERROR) << "expecting number of entry should be less than 10^9...";
+                            fclose(mesh_file);
+                            return false;
+                        }
+                    }
+
+                    for (int i = 0; i < number_of_entries; i++) {
+                        if (get_next_line(mesh_file, line)) {
+                            double value; // must be at least 1 value
+                            if (1 != sscanf(line, "%lf", &value)) {
+                                LOG(ERROR) << "incorrect file format. Line content: " << line;
+                                fclose(mesh_file);
+                                return false;
+                            }
+                        }
+                        else {
+                            LOG(ERROR) << "incorrect file format. Line content: " << line;
+                            fclose(mesh_file);
+                            return false;
+                        }
+                        progress.notify(ftell(mesh_file));
+                    }
                 }
             }
 
             fclose(mesh_file);
+
+            LOG_IF(!ignored_entries.empty(), WARNING)
+                << "current implementation handles 'Vertices', 'Tetrahedra', and 'Hexahedra'. "
+                << "The following elements/properties have been ignored: " << ignored_entries;
 
             return (mesh->n_vertices() > 0 && mesh->n_faces() > 0 && mesh->n_cells() > 0);
         }
@@ -203,6 +259,12 @@ namespace easy3d {
                 return false;
             }
 
+            if (!mesh->is_tetraheral_mesh()) {
+                LOG(ERROR) << "polyhedral mesh is not a tetrahedra (only tetrahedra can be saved in mesh format for the"
+                              "the current implementation)";
+                return false;
+            }
+
             FILE *mesh_file = fopen(file_name.c_str(), "w");
             if (NULL == mesh_file) {
                 LOG(ERROR) << "could not open file: " << file_name;
@@ -217,11 +279,15 @@ namespace easy3d {
             // print number of tet vertices
             int number_of_tet_vertices = mesh->n_vertices();
             fprintf(mesh_file, "%d\n", number_of_tet_vertices);
+
+            ProgressLogger progress(mesh->n_vertices() + mesh->n_faces() + mesh->n_cells(), true, false);
+
             // loop over tet vertices
             for (auto v : mesh->vertices()) {
                 // print position of ith tet vertex
                 const auto& p = mesh->position(v);
                 fprintf(mesh_file, "%.17lg %.17lg %.17lg 1\n", p.x, p.y, p.z);
+                progress.next();
             }
 
             // print faces
@@ -235,6 +301,7 @@ namespace easy3d {
                 const auto& vts = mesh->vertices(f);
                 // mesh standard uses 1-based indexing
                 fprintf(mesh_file, "%d %d %d 1\n", vts[0].idx() + 1, vts[1].idx() + 1, vts[2].idx() + 1);
+                progress.next();
             }
 
             // print tetrahedra
@@ -263,7 +330,9 @@ namespace easy3d {
                         vts[1].idx() + 1,
                         vts[2].idx() + 1
                 );
+                progress.next();
             }
+
             fclose(mesh_file);
             return true;
         }

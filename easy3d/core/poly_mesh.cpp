@@ -453,7 +453,7 @@ namespace easy3d {
 
             for (int i=0; i<vertices.size(); ++i) {
                 auto s = vertices[i];
-                auto t = vertices[(i+1)%3];
+                auto t = vertices[(i+1)%vertices.size()];
                 auto e = find_edge(s, t);
                 if (!e.is_valid())
                     e = new_edge(s, t);
@@ -506,6 +506,33 @@ namespace easy3d {
                 add_triangle(v0, v3, v2),
                 add_triangle(v3, v0, v1),
                 add_triangle(v2, v1, v0)
+        };
+
+        return add_cell(faces);
+    }
+
+
+    PolyMesh::Cell PolyMesh::add_hexa(Vertex v0, Vertex v1, Vertex v2, Vertex v3,
+                                      Vertex v4, Vertex v5, Vertex v6, Vertex v7) {
+        // for each face, its normal points outside the cell.
+        // 3--------------------2
+        // |\                   |\
+        // | \                  | \
+        // |  \                 |  \
+        // |   7----------------+---6
+        // |   |                |   |
+        // 0---+----------------1   |
+        //  \  |                 \  |
+        //   \ |                  \ |
+        //    \|                   \|
+        //     4--------------------5
+        std::vector<HalfFace> faces = {
+                add_quad(v0, v3, v2, v1),   // back
+                add_quad(v0, v4, v7, v3),   // left
+                add_quad(v4, v5, v6, v7),   // front
+                add_quad(v1, v2, v6, v5),   // right
+                add_quad(v2, v3, v7, v6),   // top
+                add_quad(v0, v1, v5, v4)    // bottom
         };
 
         return add_cell(faces);
