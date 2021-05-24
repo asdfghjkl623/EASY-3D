@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "easy3d/util/logging.h"
 
@@ -64,8 +64,8 @@ void DoNothingFunc() {
 
 void test_conditional_ccasional_logging() {
     for (int i = 0; i < 20; ++i) {
-        LOG_FIRST_N(4, INFO) << "Log first 4 INFO, iteration " << i << ", " << COUNTER;
-        LOG_FIRST_N(5, ERROR) << "Log first 5 ERROR, iteration " << i << ", " << COUNTER;
+        LOG_N_TIMES(4, INFO) << "Log first 4 INFO, iteration " << i << ", " << COUNTER;
+        LOG_N_TIMES(5, ERROR) << "Log first 5 ERROR, iteration " << i << ", " << COUNTER;
     }
 
     LOG(INFO) << " \n ------------------------ \n";
