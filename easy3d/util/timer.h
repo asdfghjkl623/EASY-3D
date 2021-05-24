@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_UTIL_TIMER_H
 #define EASY3D_UTIL_TIMER_H
@@ -32,13 +32,14 @@
 namespace easy3d {
 
     /**
-     * \brief An light-weight implementation of the timer mechanism.
+     * \brief A light-weight implementation of the timer mechanism.
      * \class Timer easy3d/util/timer.h
      * \details Timer functionalities are usually implemented in large libraries
      *      (e.g., the [QTimer of Qt](http://doc.qt.io/archives/qt-5.5/qtimer.html)).
      *      This Timer class provides a single-header implementation.
      *      With Timer, tasks (i.e., calling to functions) can be easily scheduled at either constant intervals
      *      or after a specified period. Timer supports any types of functions with any number of arguments.
+     *
      * \example Test_Timer  \include test/test_timer.cpp
      */
 
@@ -62,7 +63,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         static void single_shot(int delay, Class *inst, void (Class::*func)(Args...), Args... args);
@@ -73,7 +74,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         static void single_shot(int delay, Class *inst, void (Class::*func)(Args...) const, Args... args);
@@ -95,7 +96,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.    
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         void set_timeout(int delay, Class *inst, void (Class::*func)(Args...), Args... args) const;
@@ -107,7 +108,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.    
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         void set_timeout(int delay, Class *inst, void (Class::*func)(Args...) const, Args... args) const;
@@ -127,7 +128,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         void set_interval(int interval, Class *inst, void (Class::*func)(Args...), Args... args);
@@ -138,7 +139,7 @@ namespace easy3d {
          * \param inst The pointer to \c Class instance, e.g., '&a' for 'Class a' or 'this' within Class.
          * \param func The pointer to the member function of \c inst, e.g., '&Class::foo'.
          * \note When a member function has overloads, explicitly cast the function to the right function type using
-         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(Viewer::print). </tt>
+         *     e.g., <tt> static_cast<void (Viewer::*)(const std::string&, int)>(&Viewer::print). </tt>
          */
         template<class Class>
         void set_interval(int interval, Class *inst, void (Class::*func)(Args...) const, Args... args);

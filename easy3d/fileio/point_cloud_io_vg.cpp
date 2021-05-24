@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/fileio/point_cloud_io_vg.h>
 #include <easy3d/core/point_cloud.h>
@@ -188,6 +188,22 @@ namespace easy3d {
 
             cloud->resize(num);
             std::vector<vec3>& points = cloud->points();
+
+#ifdef TRANSLATE_RELATIVE_TO_FIRST_POINT
+            double x0, y0, z0;
+            input >> x0 >> y0 >> z0;
+            points[0] = vec3(0, 0, 0);
+
+            double x, y, z;
+            for (std::size_t i = 1; i < num; ++i) {
+                input >> x >> y >> z;
+                points[i] = vec3(x - x0, y - y0, z - z0);
+                if (input.fail()) {
+                    LOG(ERROR) << "failed reading the " << i << "_th point";
+                    return false;
+                }
+            }
+#else
             for (std::size_t i = 0; i < num; ++i) {
                 input >> points[i];
                 if (input.fail()) {
@@ -195,6 +211,7 @@ namespace easy3d {
                     return false;
                 }
             }
+#endif
 
             input >> dummy >> num;
             if (input.fail()) {
@@ -283,7 +300,7 @@ namespace easy3d {
             int type;
             input >> dummy >> type;
             if (input.fail()) {
-                LOG_FIRST_N(3, ERROR) << "failed reading vertex group type. " << COUNTER;
+                LOG_N_TIMES(3, ERROR) << "failed reading vertex group type. " << COUNTER;
             }
 
             std::size_t num;
@@ -295,7 +312,7 @@ namespace easy3d {
             for (std::size_t i = 0; i < num; ++i) {
                 input >> v;
                 if (input.fail()) {
-                    LOG_FIRST_N(3, ERROR) << "failed reading vertex group parameters. " << COUNTER;
+                    LOG_N_TIMES(3, ERROR) << "failed reading vertex group parameters. " << COUNTER;
                 } else
                     para[i] = v;
             }
@@ -303,7 +320,7 @@ namespace easy3d {
             std::string label;
             input >> dummy >> label;
             if (input.fail()) {
-                LOG_FIRST_N(3, ERROR) << "failed reading vertex group label. " << COUNTER;
+                LOG_N_TIMES(3, ERROR) << "failed reading vertex group label. " << COUNTER;
             }
 
             vec3 color;

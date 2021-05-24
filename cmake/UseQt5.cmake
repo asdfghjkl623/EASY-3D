@@ -1,5 +1,5 @@
-# ------------------------------------------------------------------------------
-#      Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+# *************************************************************************
+#      Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
 #      https://3d.bk.tudelft.nl/liangliang/
 #
 #      This file is part of Easy3D. If it is useful in your research/work,
@@ -21,7 +21,7 @@
 #
 #      You should have received a copy of the GNU General Public License
 #      along with this program. If not, see <http://www.gnu.org/licenses/>.
-# ------------------------------------------------------------------------------
+# *************************************************************************
 
 
 # ------------------------------------------------------------------------------
@@ -76,12 +76,15 @@ if (QT5_FOUND)
     get_target_property(QT5_LIB_LOCATION Qt5::Core LOCATION_${CMAKE_BUILD_TYPE})
     get_filename_component(QT_BINARY_DIR ${QT5_LIB_LOCATION} DIRECTORY)
 
-    # Apple uses frameworks - move up until we get to the base directory to set the bin directory properly
     if (APPLE)
+        # Apple uses frameworks - move up until we get to the base directory to set the bin directory properly
         get_filename_component(QT_BINARY_DIR ${QT_BINARY_DIR} DIRECTORY)
-        set(QT_BINARY_DIR "${QT_BINARY_DIR}/bin")
-
-        set(MACDEPLOYQT "${QT_BINARY_DIR}/macdeployqt")
+        set(QT_BINARY_DIR ${QT_BINARY_DIR}/bin)
+        set(MACDEPLOYQT ${QT_BINARY_DIR}/macdeployqt)
+        message(STATUS "macdeployqt: ${MACDEPLOYQT}")
+    elseif(WIN32)
+        set(WINDEPLOYQT ${QT_BINARY_DIR}/windeployqt.exe)
+        message(STATUS "windeployqt: ${WINDEPLOYQT}")
     endif ()
 
     # set QT5_ROOT_PATH if it wasn't set by the user

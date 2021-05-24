@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/viewer/viewer.h>
 #include <easy3d/renderer/camera.h>
@@ -37,12 +37,12 @@
 using namespace easy3d;
 
 
-// This example shows how to triangulate a general polygonal meshes (i.e., meshes
+// This example shows how to triangulate a general polygonal meshes (e.g., meshes
 // with concave faces, self−intersecting faces, and faces with holes) using the
 // tessellator of Easy3D.
 //
 // Note: For general rendering purposes, you can use the tessellator to create a
-//       trianglesDrawable without modifying the mesh.
+//       TrianglesDrawable without modifying the mesh.
 
 typedef std::vector<vec3> Hole;
 

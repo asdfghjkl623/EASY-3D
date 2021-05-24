@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/random.h>
@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 	// "v:color". Here "v:" is optional and it just indicates that this property 
 	// is defined on the vertices. You will later see properties can be defined 
 	// one edges (use "e:") and faces (use "f:") for surface meshes.
-	PointCloud::VertexProperty<vec3> colors = cloud->add_vertex_property<vec3>("v:color");
+	auto colors = cloud->add_vertex_property<vec3>("v:color");
 	for (auto v : cloud->vertices())	// iterate over all vertices
 		colors[v] = random_color();		// assign a random color to point 'v'
 
@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
 	// Here we simply print the coordinates and colors.
 
 	// The point coordinates are stored as a per-point property 'v:point'.
-	PointCloud::VertexProperty<vec3> points = cloud->get_vertex_property<vec3>("v:point");
+	auto points = cloud->get_vertex_property<vec3>("v:point");
 	for (auto v : cloud->vertices())
 		std::cout << "index: " << v.idx() << ", xyz: " << points[v] << ", color: " << colors[v] << std::endl;
 

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "paint_canvas.h"
@@ -37,7 +37,7 @@
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/renderer/shader_program.h>
 #include <easy3d/renderer/shader_manager.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/transform.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/manipulated_camera_frame.h>
@@ -56,6 +56,7 @@
 #include <easy3d/renderer/manipulator.h>
 #include <easy3d/renderer/buffers.h>
 #include <easy3d/fileio/resources.h>
+#include <easy3d/gui/picker_point_cloud.h>
 #include <easy3d/gui/picker_surface_mesh.h>
 #include <easy3d/gui/picker_model.h>
 #include <easy3d/util/file_system.h>
@@ -70,7 +71,7 @@
 #include <QClipboard>
 #include <QTime>
 #include <QMessageBox>
-
+#include <QStatusBar>
 
 using namespace easy3d;
 
@@ -81,7 +82,7 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , func_(nullptr)
         , texter_(nullptr)
         , show_easy3d_logo_(true)
-        , show_frame_rate_(true)
+        , show_frame_rate_(false)
         , dpi_scaling_(1.0)
         , samples_(0)
         , camera_(nullptr)
@@ -97,8 +98,11 @@ PaintCanvas::PaintCanvas(MainWindow* window)
         , model_picker_(nullptr)
         , allow_select_model_(false)
         , surface_mesh_picker_(nullptr)
-        , show_labels_under_mouse_(false)
+        , show_primitive_id_under_mouse_(false)
+        , show_primitive_property_under_mouse_(false)
         , picked_face_index_(-1)
+        , point_cloud_picker_(nullptr)
+        , picked_vertex_index_(-1)
         , show_coordinates_under_mouse_(false)
         , model_idx_(-1)
         , ssao_(nullptr)
@@ -151,6 +155,7 @@ void PaintCanvas::cleanup() {
     delete texter_;
     delete model_picker_;
     delete surface_mesh_picker_;
+    delete point_cloud_picker_;
 
     ShaderManager::terminate();
     TextureManager::terminate();
@@ -216,10 +221,10 @@ void PaintCanvas::initializeGL() {
     texter_->add_font(resource::directory() + "/fonts/en_Earth-Normal.ttf");
     texter_->add_font(resource::directory() + "/fonts/en_Roboto-Medium.ttf");
 
-    timer_.start();
-
     // Calls user defined method.
     init();
+
+    timer_.start();
 }
 
 
@@ -384,6 +389,48 @@ void PaintCanvas::mouseReleaseEvent(QMouseEvent *e) {
 }
 
 
+namespace details {
+    template<typename MODEL>
+    std::string get_vertex_scalar_property(MODEL *model, typename MODEL::Vertex v, const std::string &name) {
+        auto prop_float = model->template get_vertex_property<float>(name);
+        if (prop_float) return std::to_string(prop_float[v]);
+        auto prop_double = model->template get_vertex_property<double>(name);
+        if (prop_double) return std::to_string(prop_double[v]);
+        auto prop_int = model->template get_vertex_property<int>(name);
+        if (prop_int) return std::to_string(prop_int[v]);
+        auto prop_uint = model->template get_vertex_property<unsigned int>(name);
+        if (prop_uint) return std::to_string(prop_uint[v]);
+        auto prop_char = model->template get_vertex_property<char>(name);
+        if (prop_char) return std::to_string(prop_char[v]);
+        auto prop_uchar = model->template get_vertex_property<unsigned char>(name);
+        if (prop_uchar) return std::to_string(prop_uchar[v]);
+        auto prop_bool = model->template get_vertex_property<bool>(name);
+        if (prop_bool) return std::to_string(prop_bool[v]);
+        return "no scalar property is being visualized";
+    }
+
+
+    template<typename MODEL>
+    std::string get_face_scalar_property(MODEL *model, typename MODEL::Face f, const std::string &name) {
+        auto prop_float = model->template get_face_property<float>(name);
+        if (prop_float) return std::to_string(prop_float[f]);
+        auto prop_double = model->template get_face_property<double>(name);
+        if (prop_double) return std::to_string(prop_double[f]);
+        auto prop_int = model->template get_face_property<int>(name);
+        if (prop_int) return std::to_string(prop_int[f]);
+        auto prop_uint = model->template get_face_property<unsigned int>(name);
+        if (prop_uint) return std::to_string(prop_uint[f]);
+        auto prop_char = model->template get_face_property<char>(name);
+        if (prop_char) return std::to_string(prop_char[f]);
+        auto prop_uchar = model->template get_face_property<unsigned char>(name);
+        if (prop_uchar) return std::to_string(prop_uchar[f]);
+        auto prop_bool = model->template get_face_property<bool>(name);
+        if (prop_bool) return std::to_string(prop_bool[f]);
+        return "no scalar property is being visualized";
+    }
+}
+
+
 void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
     int x = e->pos().x(), y = e->pos().y();
     if (x < 0 || x > width() || y < 0 || y > height() || walkThrough()->interpolator()->is_interpolation_started()) {
@@ -443,18 +490,80 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
         }
     }
 
-    if (show_labels_under_mouse_) {
-        auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
-        if (mesh) {
+    if (show_primitive_id_under_mouse_ || show_primitive_property_under_mouse_) { // then need to pick primitives
+        picked_face_index_ = -1;
+        picked_vertex_index_ = -1;
+        if (dynamic_cast<SurfaceMesh *>(currentModel())) {
+            auto mesh = dynamic_cast<SurfaceMesh *>(currentModel());
             if (!surface_mesh_picker_)
                 surface_mesh_picker_ = new SurfaceMeshPicker(camera());
             makeCurrent();
             picked_face_index_ = surface_mesh_picker_->pick_face(mesh, e->pos().x(), e->pos().y()).idx();
             doneCurrent();
+
+            auto drawable = mesh->renderer()->get_triangles_drawable("faces");
+            if (picked_face_index_ >= 0) { // highlight the picked face
+                drawable->set_highlight(true);
+                drawable->set_highlight_range({picked_face_index_, picked_face_index_});
+            }
+            else {
+                drawable->set_highlight(false);
+                drawable->set_highlight_range({-1, -1});
+            }
+            update();
         }
-        else
-            picked_face_index_ = -1;
-        update();
+        else if (dynamic_cast<PointCloud *>(currentModel())) {
+            auto cloud = dynamic_cast<PointCloud *>(currentModel());
+            if (!point_cloud_picker_)
+                point_cloud_picker_ = new PointCloudPicker(camera());
+            makeCurrent();
+            picked_vertex_index_ = point_cloud_picker_->pick_vertex(cloud, e->pos().x(), e->pos().y()).idx();
+            doneCurrent();
+
+            auto drawable = cloud->renderer()->get_points_drawable("vertices");
+            if (picked_vertex_index_ >= 0) { // highlight the picked vertex
+                drawable->set_highlight(true);
+                drawable->set_highlight_range({picked_vertex_index_, picked_vertex_index_});
+            }
+            else {
+                drawable->set_highlight(false);
+                drawable->set_highlight_range({-1, -1});
+            }
+            update();
+        }
+
+        if (show_primitive_property_under_mouse_) {
+            if (picked_vertex_index_ >= 0) { // picked point cloud vertex
+                auto drawable = currentModel()->renderer()->get_points_drawable("vertices");
+                if (drawable->coloring_method() == easy3d::State::SCALAR_FIELD) {
+                    const std::string& name = drawable->property_name();
+                    auto vertex = PointCloud::Vertex(picked_vertex_index_);
+                    auto cloud = dynamic_cast<PointCloud *>(currentModel());
+                    const std::string value_str = details::get_vertex_scalar_property(cloud, vertex, name);
+                    std::stringstream stream;
+                    stream << "'" << name << "' on " << vertex << ": " << value_str;
+                    window_->statusBar()->showMessage(QString::fromStdString(stream.str()), 2000);
+                }
+                else
+                    window_->statusBar()->showMessage("no scalar property is being visualized", 2000);
+            }
+            else if (picked_face_index_ >= 0) { // picked surface mesh face
+                auto drawable = currentModel()->renderer()->get_triangles_drawable("faces");
+                if (drawable->coloring_method() == easy3d::State::SCALAR_FIELD && drawable->property_location() == easy3d::State::FACE) {
+                    const std::string& name = drawable->property_name();
+                    auto face = SurfaceMesh::Face(picked_face_index_);
+                    auto mesh = dynamic_cast<SurfaceMesh *>(currentModel());
+                    const std::string value_str = details::get_face_scalar_property(mesh, face, name);
+                    std::stringstream stream;
+                    stream << "'" << name << "' on " << face << ": " << value_str;
+                    window_->statusBar()->showMessage(QString::fromStdString(stream.str()), 2000);
+                }
+                else
+                    window_->statusBar()->showMessage("no scalar property is being visualized", 2000);
+            }
+            else
+                window_->statusBar()->showMessage("no primitive found under mouse", 2000);
+        }
     }
 
     if (show_coordinates_under_mouse_) {
@@ -463,14 +572,14 @@ void PaintCanvas::mouseMoveEvent(QMouseEvent *e) {
         QString coords= "XYZ = [-, -, -]";
         if (found)
             coords = QString("XYZ = [%1, %2, %3]").arg(p.x).arg(p.y).arg(p.z);
-        window_->setPointUnderMouse(coords);
+        window_->statusBar()->showMessage(coords, 2000);
     }
 
     mouse_current_pos_ = e->pos();
     QOpenGLWidget::mouseMoveEvent(e);
 
-    if (pressed_button_ == Qt::LeftButton && modifiers_ == Qt::ControlModifier) // zoom on region
-        update();
+//    if (pressed_button_ == Qt::LeftButton && modifiers_ == Qt::ControlModifier) // zoom on region
+//        update();
 }
 
 
@@ -776,6 +885,8 @@ std::string PaintCanvas::usage() const {
             "  Ctrl + Left/Right:   Move camera left/right                      \n"
             "  Up/Down:             Move camera forward/backward                \n"
             "  Ctrl + Up/Down:      Move camera up/down                         \n"
+            "  Ctrl + 'c':          Copy current view status to clipboard       \n"
+            "  Ctrl + 'v':          Restore view status from clipboard          \n"
             " ------------------------------------------------------------------\n"
             "  'f':                 Fit screen (all models)                     \n"
             "  'c':                 Fit screen (current model only)             \n"
@@ -910,7 +1021,12 @@ void PaintCanvas::adjustSceneRadius() {
     const int count = walkThrough()->interpolator()->number_of_keyframes();
     for (int i = 0; i < count; ++i)
         box.add_point(walkThrough()->interpolator()->keyframe(i).position());
-   camera()->setSceneRadius(box.radius());
+
+    // attention: the scene center is not changed.
+    camera()->setSceneRadius(
+            std::max(distance(camera()->sceneCenter(), box.min_point()),
+                     distance(camera()->sceneCenter(), box.max_point()))
+            );
 }
 
 
@@ -1015,16 +1131,16 @@ void PaintCanvas::drawCornerAxes() {
         const float base = 0.5f;   // the cylinder length, relative to the allowed region
         const float head = 0.2f;   // the cone length, relative to the allowed region
         std::vector<vec3> points, normals, colors;
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
-        opengl::prepare_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
+        shapes::create_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
                              colors);
-        opengl::prepare_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
+        shapes::create_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
                              colors);
-        opengl::prepare_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
+        shapes::create_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
                              colors);
-        opengl::prepare_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
+        shapes::create_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
         drawable_axes_ = new TrianglesDrawable("corner_axes");
         drawable_axes_->update_vertex_buffer(points);
         drawable_axes_->update_normal_buffer(normals);
@@ -1088,7 +1204,7 @@ void PaintCanvas::drawCornerAxes() {
 }
 
 
-void PaintCanvas::drawFaceAndVertexLabels(const QColor& face_color, const QColor& vertex_color) {
+void PaintCanvas::drawPickedFaceAndItsVerticesIDs(const QColor& face_color, const QColor& vertex_color) {
     SurfaceMesh* mesh = dynamic_cast<SurfaceMesh*>(currentModel());
     if (!mesh || picked_face_index_ < 0 || picked_face_index_ >= mesh->n_faces())
         return;
@@ -1128,6 +1244,36 @@ void PaintCanvas::drawFaceAndVertexLabels(const QColor& face_color, const QColor
 }
 
 
+void PaintCanvas::drawPickedVertexID(const QColor &vertex_color) {
+    PointCloud* cloud = dynamic_cast<PointCloud*>(currentModel());
+    if (!cloud || picked_vertex_index_ < 0 || picked_vertex_index_ >= cloud->n_vertices())
+        return;
+
+    // using QPainter
+    QPainter painter;
+    painter.begin(this);
+    painter.setRenderHint(QPainter::HighQualityAntialiasing);
+    painter.setRenderHint(QPainter::TextAntialiasing);
+    painter.beginNativePainting();
+
+    mat4 manip = cloud->manipulator()->matrix();
+
+    // draw the ID of the picked vertex
+    auto vertex = PointCloud::Vertex(picked_vertex_index_);
+    vec3 pos = cloud->position(vertex);
+    pos = camera()->projectedCoordinatesOf(manip * pos);
+    painter.setPen(vertex_color);
+    painter.drawText(pos.x, pos.y, QString::fromStdString("v" + std::to_string(picked_vertex_index_)));
+    easy3d_debug_log_gl_error;
+
+    // finish
+    painter.endNativePainting();
+    painter.end();
+    // Liangliang: it seems QPainter disables depth test?
+    func_->glEnable(GL_DEPTH_TEST);
+}
+
+
 void PaintCanvas::preDraw() {
     // For normal drawing, i.e., drawing triggered by the paintEvent(),
     // the clearing is done before entering paintGL().
@@ -1149,18 +1295,19 @@ void PaintCanvas::postDraw() {
 
     if (show_frame_rate_) {
         // FPS computation
-        static unsigned int fpsCounter = 0;
+        static unsigned int fps_count = 0;
         static double fps = 0.0;
-        static const unsigned int maxCounter = 40;
-        static QString fpsString("Rendering (Hz): --");
-        if (++fpsCounter == maxCounter) {
-            fps = 1000.0 * maxCounter / timer_.restart();
-            fpsString = tr("Rendering (Hz): %1 ").arg(fps, 0, 'f', ((fps < 10.0) ? 1 : 0));
-            fpsCounter = 0;
+        static const unsigned int max_count = 40;
+        static QString fps_string("fps: ??");
+        if (++fps_count == max_count) {
+            fps = 1000.0 * max_count / timer_.restart();
+            fps_string = tr("fps: %1").arg(fps, 0, 'f', ((fps < 10.0) ? 1 : 0));
+            fps_count = 0;
         }
 
 #if 0   // draw frame rate text using Easy3D's built-in TextRenderer
-        texter_->draw(fpsString.toStdString(), 20.0f * dpi_scaling(), 50.0f * dpi_scaling(), 16, 1);
+        if (texter_ && texter_->num_fonts() >=2)
+            texter_->draw(fps_string.toStdString(), 20.0f * dpi_scaling(), 50.0f * dpi_scaling(), 16, 1);
 #else   // draw frame rate text using Qt.
         QPainter painter; easy3d_debug_log_gl_error;
         painter.begin(this);
@@ -1168,7 +1315,7 @@ void PaintCanvas::postDraw() {
         painter.setRenderHint(QPainter::TextAntialiasing);
         painter.setPen(Qt::black);
         painter.beginNativePainting(); easy3d_debug_log_gl_error;
-        painter.drawText(20, 50, fpsString);
+        painter.drawText(20, 50, fps_string);
         painter.endNativePainting();
         painter.end();  easy3d_debug_log_gl_error;
         func_->glEnable(GL_DEPTH_TEST); // it seems QPainter disables depth test?
@@ -1180,11 +1327,9 @@ void PaintCanvas::postDraw() {
         walkThrough()->draw();
     easy3d_debug_log_gl_error;
 
-    if (show_labels_under_mouse_) {
-        auto mesh = dynamic_cast<SurfaceMesh*>(currentModel());
-        if (mesh && picked_face_index_ >= 0 && picked_face_index_ < mesh->n_faces()) {
-            drawFaceAndVertexLabels(Qt::darkBlue, Qt::darkMagenta);
-        }
+    if (show_primitive_id_under_mouse_) {
+        drawPickedFaceAndItsVerticesIDs(Qt::darkBlue, Qt::darkMagenta);
+        drawPickedVertexID(Qt::darkMagenta);
     }
 
     // ------------- draw the picking region with transparency  ---------------
@@ -1193,11 +1338,11 @@ void PaintCanvas::postDraw() {
         const Rect rect(mouse_pressed_pos_.x(), mouse_current_pos_.x(), mouse_pressed_pos_.y(), mouse_current_pos_.y());
         if (rect.width() > 0 || rect.height() > 0) {
             // draw the boundary of the rect
-            opengl::draw_quad_wire(rect, vec4(0.0f, 0.0f, 1.0f, 1.0f), width(), height(), -1.0f);
+            shapes::draw_quad_wire(rect, vec4(0.0f, 0.0f, 1.0f, 1.0f), width(), height(), -1.0f);
             // draw the transparent face
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            opengl::draw_quad_filled(rect, vec4(0.0f, 0.0f, 1.0f, 0.2f), width(), height(), -0.9f);
+            shapes::draw_quad_filled(rect, vec4(0.0f, 0.0f, 1.0f, 0.2f), width(), height(), -0.9f);
             glDisable(GL_BLEND);
         }
     }
@@ -1229,7 +1374,7 @@ void PaintCanvas::postDraw() {
         const int radius = 150; // pixels
         float ratio = camera_->pixelGLRatio(camera_->pivotPoint());
         auto manip = mat4::translation(camera_->pivotPoint()) * mat4::scale(radius * ratio) ;
-        opengl::draw_sphere_big_circles(drawable_manip_sphere_, camera_->modelViewProjectionMatrix(), manip);
+        shapes::draw_sphere_big_circles(drawable_manip_sphere_, camera_->modelViewProjectionMatrix(), manip);
     }
 }
 
@@ -1610,19 +1755,63 @@ void PaintCanvas::restoreState(std::istream& input) {
 }
 
 
-void PaintCanvas::showFaceVertexLabelsUnderMouse(bool b) {
-    show_labels_under_mouse_ = b;
+void PaintCanvas::showPrimitiveIDUnderMouse(bool b) {
+    show_primitive_id_under_mouse_ = b;
+
+    picked_face_index_ = -1;
+
+    auto mesh = dynamic_cast<SurfaceMesh *>(currentModel());
+    if (mesh) {
+        auto drawable = mesh->renderer()->get_triangles_drawable("faces");
+        drawable->set_highlight(b);
+        drawable->set_highlight_range({-1, -1});
+    }
+
+    auto cloud = dynamic_cast<PointCloud *>(currentModel());
+    if (cloud) {
+        auto drawable = cloud->renderer()->get_points_drawable("vertices");
+        drawable->set_highlight(b);
+        drawable->set_highlight_range({-1, -1});
+    }
+
     update();
 }
 
 
-void PaintCanvas::showCordinatesUnderMouse(bool b) {
+void PaintCanvas::showPrimitivePropertyUnderMouse(bool b) {
+    show_primitive_property_under_mouse_ = b;
+    if (show_primitive_property_under_mouse_ && show_coordinates_under_mouse_)
+        show_coordinates_under_mouse_ = false;
+
+    picked_face_index_ = -1;
+
+    auto mesh = dynamic_cast<SurfaceMesh *>(currentModel());
+    if (mesh) {
+        auto drawable = mesh->renderer()->get_triangles_drawable("faces");
+        drawable->set_highlight(b);
+        drawable->set_highlight_range({-1, -1});
+    }
+
+    auto cloud = dynamic_cast<PointCloud *>(currentModel());
+    if (cloud) {
+        auto drawable = cloud->renderer()->get_points_drawable("vertices");
+        drawable->set_highlight(b);
+        drawable->set_highlight_range({-1, -1});
+    }
+
+    update();
+}
+
+
+void PaintCanvas::showCoordinatesUnderMouse(bool b) {
     show_coordinates_under_mouse_ = b;
+    if (show_primitive_property_under_mouse_ && show_coordinates_under_mouse_)
+        show_primitive_property_under_mouse_ = false;
 
     QString coords("");
     if (show_coordinates_under_mouse_)
         coords = "XYZ = [-, -, -]";
-    window_->setPointUnderMouse(coords);
+    window_->statusBar()->showMessage(coords, 0);
 }
 
 

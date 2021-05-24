@@ -1,3 +1,28 @@
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
+ * https://3d.bk.tudelft.nl/liangliang/
+ *
+ * This file is part of Easy3D. If it is useful in your research/work,
+ * I would be grateful if you show your appreciation by citing it:
+ * ------------------------------------------------------------------
+ *      Liangliang Nan.
+ *      Easy3D: a lightweight, easy-to-use, and efficient C++
+ *      library for processing and rendering 3D data. 2018.
+ * ------------------------------------------------------------------
+ * Easy3D is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License Version 3
+ * as published by the Free Software Foundation.
+ *
+ * Easy3D is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ ********************************************************************/
+
+
 #include "widget_checker_sphere.h"
 
 #include <QMouseEvent>
@@ -8,7 +33,7 @@
 #include <easy3d/renderer/shader_program.h>
 #include <easy3d/renderer/shader_manager.h>
 #include <easy3d/renderer/opengl_info.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/setting.h>
 
 
@@ -155,7 +180,7 @@ void WidgetCheckerSphere::createSpheres() {
     const vec3 color2(1, 1, 1);
 
     std::vector<vec3> vertices, normals, colors;
-	opengl::prepare_checker_sphere(center, radius, slices, stacks, checker_size, color1, color2, vertices, normals, colors);
+	shapes::create_checker_sphere(center, radius, slices, stacks, checker_size, color1, color2, vertices, normals, colors);
 
     checkerSphere_ = new TrianglesDrawable("checker_sphere");
     checkerSphere_->update_vertex_buffer(vertices);
@@ -166,7 +191,7 @@ void WidgetCheckerSphere::createSpheres() {
     vertices.clear();
     normals.clear();
     colors.clear();
-    opengl::prepare_sphere(vec3(0, 0, 0), 0.1, 10, 10, vec3(1, 0, 0), vertices, normals, colors);
+    shapes::create_sphere(vec3(0, 0, 0), 0.1, 10, 10, vec3(1, 0, 0), vertices, normals, colors);
     lightSphere_ = new TrianglesDrawable("light");
     lightSphere_->update_vertex_buffer(vertices);
     lightSphere_->update_normal_buffer(normals);

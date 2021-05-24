@@ -4,7 +4,6 @@ get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 project(${PROJECT_NAME})
 
 
-
 include(../../cmake/UseQt5.cmake)
 if (NOT QT5_FOUND)
     message(WARNING "${PROJECT_NAME} requires Qt but Qt was not found. You can set 'Qt5_DIR' to the "
@@ -46,6 +45,13 @@ set(${PROJECT_NAME}_HEADERS
         widgets/widget_drawable_triangles.h
         widgets/widget_global_setting.h
         widgets/widget_log.h
+
+        tools/canvas.h
+        tools/tool.h
+        tools/tool_manager.h
+        tools/tool_segmentation_surface_mesh.h
+        tools/tool_selection_point_cloud.h
+        tools/tool_selection_surface_mesh.h
         )
 
 set(${PROJECT_NAME}_SOURCES
@@ -82,6 +88,12 @@ set(${PROJECT_NAME}_SOURCES
         widgets/widget_global_setting.cpp
         widgets/widget_model_list.cpp
         widgets/widget_log.cpp
+
+        tools/tool.cpp
+        tools/tool_manager.cpp
+        tools/tool_segmentation_surface_mesh.cpp
+        tools/tool_selection_point_cloud.cpp
+        tools/tool_selection_surface_mesh.cpp
         )
 
 set(${PROJECT_NAME}_FORMS
@@ -113,14 +125,36 @@ set(${PROJECT_NAME}_FORMS
         )
 
 set(${PROJECT_NAME}_RESOURCES
-        mapple.qrc
+        resources/Mapple.qrc
+        resources/Mapple.rc
         )
+
+include(../../cmake/FindFFMPEG.cmake)
+if (FFMPEG_FOUND)
+    #Append the files of the video encoder to the source file list
+    list(APPEND ${PROJECT_NAME}_HEADERS video/QVideoEncoder.h)
+    list(APPEND ${PROJECT_NAME}_SOURCES video/QVideoEncoder.cpp)
+else ()
+    message(WARNING "${PROJECT_NAME} requires FFMPEG to generate video files but FFMPEG was not found. "
+            "Without FFMPEG, animations can only be recorded as a sequence of images. "
+            "To use FFMPEG, make sure FFMPEG exists on your system (install/build FFMPEG if necessary). "
+            "Modify the search paths in 'FindFFMPEG.cmake' for 'include' and 'lib' directories, and then run CMake."
+            )
+endif ()
+
 
 if (WIN32 OR MSVC)
     add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES})
     # if you want to get rid of the (system) console, use
     #	add_executable( ${PROJECT_NAME} WIN32 ${${PROJECT_NAME}_HEADERS} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_FORMS} ${${PROJECT_NAME}_RESOURCES} )
     #       target_link_libraries( ${PROJECT_NAME} Qt5::WinMain )
+
+#    add_custom_command(
+#            TARGET ${PROJECT_NAME}
+#            POST_BUILD
+#            COMMAND ${WINDEPLOYQT} --no-translations --verbose 0 $<TARGET_FILE:${PROJECT_NAME}>
+#    )
+
 elseif (APPLE)
     function(resource VAR SOURCE_PATH DESTINATION PATTERN)
         file(GLOB_RECURSE _LIST CONFIGURE_DEPENDS ${SOURCE_PATH}/${PATTERN})
@@ -142,7 +176,7 @@ elseif (APPLE)
     resource(FRAGMENT_SHADERS ${EASY3D_ROOT}/resources/shaders Resources/shaders *.frag)
     resource(COLORMAPS ${EASY3D_ROOT}/resources/colormaps Resources/colormaps *.png)
     resource(FONTS ${EASY3D_ROOT}/resources/fonts Resources/fonts *.ttf)
-    resource(IMAGES ${EASY3D_ROOT}/resources/images Resources/images *.jpg)
+    resource(IMAGES ${EASY3D_ROOT}/resources/images Resources/images overview.jpg)  # overview.jpg is for splash screen
     resource(TEXTURES ${EASY3D_ROOT}/resources/textures Resources/textures *.png)
 
     # This tells CMake where to find and install the ICON file
@@ -164,9 +198,9 @@ elseif (APPLE)
             MACOSX_BUNDLE TRUE
             MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Mac/Mapple.plist"
             MACOSX_BUNDLE_ICON_FILE "Mapple.icns"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
-            MACOSX_BUNDLE_LONG_VERSION_STRING "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
-            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${EASY3D_MAJOR_VERSION}.${EASY3D_MINOR_VERSION}.${EASY3D_PATCH_VERSION}"
+            MACOSX_BUNDLE_LONG_VERSION_STRING "${EASY3D_MAJOR_VERSION}.${EASY3D_MINOR_VERSION}.${EASY3D_PATCH_VERSION}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${EASY3D_MAJOR_VERSION}.${EASY3D_MINOR_VERSION}.${EASY3D_PATCH_VERSION}"
             MACOSX_BUNDLE_GUI_IDENTIFIER "liangliang.nan@gmail.com"
             )
 else ()
@@ -187,24 +221,15 @@ if (MSVC)
     target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_DEPRECATE)
 endif ()
 
-target_link_libraries(${PROJECT_NAME} Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
+target_link_libraries(${PROJECT_NAME} PRIVATE Qt5::Core Qt5::Gui Qt5::Widgets Qt5::OpenGL)
 
-add_subdirectory(tools)
-target_link_libraries(${PROJECT_NAME} renderer algo tools)
-
+target_link_libraries(${PROJECT_NAME} PRIVATE easy3d_renderer easy3d_algo easy3d_gui)
 if (EASY3D_HAS_CGAL)
-    target_link_libraries(${PROJECT_NAME} algo_ext)
+    target_link_libraries(${PROJECT_NAME} PRIVATE easy3d_algo_ext)
 endif ()
 
-include(../../cmake/FindFFMPEG.cmake)
 if (FFMPEG_FOUND)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC HAS_FFMPEG)
-    add_subdirectory(video)
-    target_link_libraries(${PROJECT_NAME} video)
-else ()
-    message(WARNING "${PROJECT_NAME} requires FFMPEG to generate video files but FFMPEG was not found. "
-            "Without FFMPEG, animations can only be recorded as a sequence of images. "
-            "To use FFMPEG, make sure FFMPEG exists on your system (install/build FFMPEG if necessary). "
-            "Modify the search paths in 'FindFFMPEG.cmake' for 'include' and 'lib' directories, and then run CMake."
-            )
+    target_include_directories(${PROJECT_NAME} PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE HAS_FFMPEG)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${FFMPEG_LIBRARIES})
 endif ()

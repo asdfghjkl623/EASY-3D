@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_CORE_SPLINE_CURVE_INTERPOLATION_H
 #define EASY3D_CORE_SPLINE_CURVE_INTERPOLATION_H
@@ -143,10 +143,23 @@ namespace easy3d {
 
 
     template<typename Point_t>
-    void SplineCurveInterpolation<Point_t>::set_points(const std::vector<FT> &parameters,
-                                                       const std::vector<Point_t> &points, bool cubic_spline) {
-        if (parameters.empty() || parameters.size() != points.size())
+    void SplineCurveInterpolation<Point_t>::set_points(const std::vector<FT> &input_parameters,
+                                                       const std::vector<Point_t> &input_points, bool cubic_spline) {
+        if (input_parameters.empty() || input_parameters.size() != input_points.size())
             return;
+
+        // filter out non-monotone data
+        std::vector<FT> parameters;
+        std::vector<Point_t> points;
+        for (std::size_t i=0; i<input_parameters.size(); ++i) {
+            const FT para = input_parameters[i];
+            if (i == 0 || para > parameters.back()) {
+                parameters.push_back(para);
+                points.push_back(input_points[i]);
+            }
+        }
+        const int diff = input_points.size() - points.size();
+        LOG_IF(diff > 0, WARNING) << diff << " data points discarded because the input has to be monotonously increasing";
 
         dim_ = points[0].dimension();
         largest_t_ = parameters.back();

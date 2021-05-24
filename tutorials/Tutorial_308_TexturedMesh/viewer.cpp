@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 
@@ -112,7 +112,7 @@ namespace easy3d {
                 if (mesh->target(h) == v)
                     return h;
             }
-            LOG_FIRST_N(3, ERROR) << "could not find a halfedge pointing to " << v << " in face " << face
+            LOG_N_TIMES(3, ERROR) << "could not find a halfedge pointing to " << v << " in face " << face
                                   << ". " << COUNTER;
             return SurfaceMesh::Halfedge();
         };
@@ -256,7 +256,7 @@ namespace easy3d {
 
             const auto &d_indices = tessellator.elements();
 
-            TrianglesDrawable *drawable = mesh->renderer()->add_triangles_drawable("faces_" + std::to_string(i));
+            auto drawable = mesh->renderer()->add_triangles_drawable("faces_" + std::to_string(i));
 
             drawable->update_element_buffer(d_indices);
             drawable->update_vertex_buffer(d_points);
@@ -272,6 +272,7 @@ namespace easy3d {
                     Texture *tex = TextureManager::request(group.tex_file, Texture::REPEAT);
                     if (tex) {
                         drawable->set_texture_coloring(State::HALFEDGE, "h:texcoord", tex);
+                        drawable->set_distinct_back_color(false);
                         LOG(INFO) << "texture created from " << group.tex_file;
                     }
                 }

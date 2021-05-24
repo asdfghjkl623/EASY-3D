@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/vertex_array_object.h>
 
@@ -173,8 +173,9 @@ namespace easy3d {
 		// Liangliang: should work, but haven't tested yet.
         glBindBuffer(target, buffer);                   easy3d_debug_log_gl_error;
 		// Liangliang: Finally, I found this is the place to call glMemoryBarrier()
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);	easy3d_debug_log_gl_error;
-        void* ptr = glMapBuffer(buffer, access);        easy3d_debug_log_gl_error;
+		// we don't have shader storage buffer
+//		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);	easy3d_debug_log_gl_error;
+        void* ptr = glMapBuffer(target, access);        easy3d_debug_log_gl_error;
         glBindBuffer(target, 0);                        easy3d_debug_log_gl_error;
 		return ptr;
 	}
@@ -183,7 +184,7 @@ namespace easy3d {
     void VertexArrayObject::unmap_buffer(GLenum target, GLuint buffer) {
 		// Liangliang: should work, but haven't tested yet.
         glBindBuffer(target, buffer);	easy3d_debug_log_gl_error;
-        glUnmapBuffer(buffer);          easy3d_debug_log_gl_error;
+        glUnmapBuffer(target);          easy3d_debug_log_gl_error;
         glBindBuffer(target, 0);        easy3d_debug_log_gl_error;
 	}
 

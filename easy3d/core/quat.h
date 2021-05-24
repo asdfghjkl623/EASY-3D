@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 /** ----------------------------------------------------------
  *
@@ -112,6 +112,12 @@ namespace easy3d {
         Quat()
         {
             _q[0] = _q[1] = _q[2] = FT(0);  _q[3] = FT(1);
+        }
+
+        /** \brief Constructor from rotation matrix. See also set_from_rotation_matrix(). */
+        explicit Quat(const Mat3<FT>& m)
+        {
+            set_from_rotation_matrix(m);
         }
 
         /** \brief Constructor from rotation axis (non null) and angle (in radians). See also set_axis_angle(). */
@@ -358,7 +364,7 @@ namespace easy3d {
         static thisclass random_quat();
 
         //data intentionally left public to allow q.x ...
-    private:
+    public:
         /* The internal data representation is private, use operator[] to access values. */
         union {
             struct { FT x; FT y; FT z; FT w; };

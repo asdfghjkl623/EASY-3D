@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 
@@ -177,25 +177,13 @@ bool RealCamera::read_bundler_file(const std::string& file_name) {
         cam.w = 3072;
         cam.h = 2048;
 
-		mat3 r;
+		mat3 R;
 		for (int i = 0; i < 9; ++i)
-            r[i] = static_cast<float>(c.R[i]);
-		r = transpose(r); // r is column-major
+            R[i] = static_cast<float>(c.R[i]);
+        R = transpose(R); // r is column-major
 
-		quat q;
-		q.set_from_rotation_matrix(r);
-
-		vec3 axis;
-		float angle;
-		q.get_axis_angle(axis, angle);
-		axis *= angle;
-		cam.rx = axis.x;
-		cam.ry = axis.y;
-		cam.rz = axis.z;
-
-        cam.tx = static_cast<float>(c.t[0]);
-        cam.ty = static_cast<float>(c.t[1]);
-        cam.tz = static_cast<float>(c.t[2]);
+        cam.R = R;
+        cam.t = vec3(c.t);
 	
 		views_.push_back(cam);
 	}

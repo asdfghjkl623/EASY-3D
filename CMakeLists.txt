@@ -7,23 +7,19 @@ endif ()
 
 ################################################################################
 
-get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-project(${PROJECT_NAME})
+project(Easy3D)
 
-set (PROJECT_MAJOR 2)
-set (PROJECT_MINOR 4)
-set (PROJECT_PATCH 2)
-set (PROJECT_VERSION "${PROJECT_MAJOR}.${PROJECT_MINOR}.${PROJECT_PATCH}")
-add_definitions("-DPROJECT_VERSION=\"${PROJECT_VERSION}\"")
+set (EASY3D_MAJOR_VERSION 2)
+set (EASY3D_MINOR_VERSION 4)
+set (EASY3D_PATCH_VERSION 4)
+set (EASY3D_VERSION "${EASY3D_MAJOR_VERSION}.${EASY3D_MINOR_VERSION}.${EASY3D_PATCH_VERSION}")
 
 ################################################################################
 
-# One shouldn't generate the BUILD project directly in the SOURCES folder!
+# Discourage users to build Easy3D directly in its root directory
 if ( ${CMAKE_CURRENT_BINARY_DIR} STREQUAL ${CMAKE_CURRENT_SOURCE_DIR} )
         if ( NOT SAME_BUILD_AND_SOURCE_FOLDER_WARNING_ALREADY_ISSUED )
-                message(FATAL_ERROR
-                    "It is not advised to BUILD the binaries directly in the SOURCE folder!\n If
-                    you want to proceed with this option, just CONFIGURE the project once again" )
+                message(WARNING "It is NOT advised to build Easy3D directly in its root directory!" )
                 set( SAME_BUILD_AND_SOURCE_FOLDER_WARNING_ALREADY_ISSUED TRUE )
         endif()
 endif()
@@ -61,8 +57,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # Build Qt-based examples/applications
 option(EASY3D_ENABLE_QT             "Build Qt-based examples/applications"  OFF)
-# Build application EasyDeploy (EASY3D_ENABLE_QT must be enabled first)
-option(EASY3D_BUILD_EASYDEPLOY      "Build application EasyDeploy"          OFF)
 # Build tutorials
 option(EASY3D_BUILD_TUTORIALS       "Build Easy3D Tutorials"                ON)
 # Build documentation
@@ -74,8 +68,14 @@ option(EASY3D_BUILD_TESTS           "Build Easy3D Tests"                    OFF)
 
 find_package(CGAL QUIET)
 if (CGAL_FOUND)
-    set(EASY3D_HAS_CGAL TRUE)
-    add_definitions(-DHAS_CGAL)
+    if(CGAL_VERSION VERSION_GREATER_EQUAL "5.1")
+        set(EASY3D_HAS_CGAL TRUE)
+        add_definitions(-DHAS_CGAL)
+        message(STATUS "Found CGAL v${CGAL_VERSION}")
+    else()
+        set(EASY3D_HAS_CGAL FALSE)
+        message(WARNING "CGAL v${CGAL_VERSION} is found but Easy3D requires at least version 5.1.")
+    endif()
 else ()
     set(EASY3D_HAS_CGAL FALSE)
     message(WARNING "Some advanced features require CGAL but CGAL was not found. Easy3D will be built without these features. "
@@ -88,8 +88,9 @@ endif ()
 set(EASY3D_ROOT         ${CMAKE_CURRENT_LIST_DIR})
 set(EASY3D_THIRD_PARTY  ${EASY3D_ROOT}/3rd_party)
 
-set(EASY3D_INCLUDE_DIR  ${EASY3D_ROOT} ${CMAKE_CURRENT_BINARY_DIR})
+set(EASY3D_INCLUDE_DIR  ${EASY3D_ROOT})
 set(EASY3D_SOURCE_DIR   ${EASY3D_ROOT})
+set(EASY3D_BINARY_DIR   ${CMAKE_BINARY_DIR})
 
 ### conditionally compile certain modules depending on libraries found on the system
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
@@ -102,32 +103,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY  ${CMAKE_BINARY_DIR}/lib)
 
 ################################################################################
 
-# EasyLogging++: request all features
-add_definitions(
-        -DELPP_FEATURE_ALL
-        -DELPP_STL_LOGGING
-        -DELPP_THREAD_SAFE
-        -DELPP_NO_DEFAULT_LOG_FILE
-        -DELPP_DISABLE_DEFAULT_CRASH_HANDLING
-)
-# EasyLogging++: for stack trace
-include(CheckIncludeFileCXX)
-check_include_file_cxx("execinfo.h" HAVE_EXECINFO)
-if (HAVE_EXECINFO)
-    add_definitions(-DHAVE_EXECINFO)
-endif()
-
-################################################################################
-# get a clean windows
-if (WIN32 OR MSVC)
-    add_definitions(-DNOMINMAX)
-    if(MSVC)
-        add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
-    endif()
-endif()
-
-################################################################################
-
 add_subdirectory(3rd_party)
 
 add_subdirectory(easy3d)
@@ -137,7 +112,7 @@ if(EASY3D_BUILD_TUTORIALS)
 endif()
 
 if(EASY3D_BUILD_TESTS)
-    add_subdirectory(test)
+    add_subdirectory(tests)
 endif()
 
 add_subdirectory(applications)
@@ -165,10 +140,5 @@ endif ()
 
 # hide some variables that might be set in 3rd_party libraries
 mark_as_advanced(FORCE BUILD_SHARED_LIBS)
-mark_as_advanced(FORCE BUILD_TESTING)
 
 ################################################################################
-
-## Resources
-# Copy resources dirs into our shadow build directory
-file( COPY ${CMAKE_CURRENT_SOURCE_DIR}/resources DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} )

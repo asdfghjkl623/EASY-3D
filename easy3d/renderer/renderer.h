@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_RENDERER_RENDERER_H
 #define EASY3D_RENDERER_RENDERER_H
@@ -80,11 +80,13 @@ namespace easy3d {
 
         /// Returns whether the model is currently visible.
         bool is_visible() const { return visible_; }
+
         /// Shows/Hides the model.
         void set_visible(bool b) { visible_ = b; }
 
         /// Returns whether the model has been selected.
         bool is_selected() const { return selected_; }
+
         /// Select/Deselect the model. The state of all its drawables will change accordingly.
         void set_selected(bool b);
 
@@ -94,7 +96,7 @@ namespace easy3d {
          *      this renderer is attached. The effect is equivalent to calling Drawable::update() functions for all
          *      the drawables of this model.
          * @param update_bbox \c true to recompute the bounding box of the model.
-         * @Note: To achieve better performance, it is wiser to update only the affected drawables and buffers.
+         * @note: To achieve better performance, it is wiser to update only the affected drawables and buffers.
          * \sa  Drawable::update()
          */
         void update(bool update_bbox = true);
@@ -206,25 +208,46 @@ namespace easy3d {
 
         /**
          * @brief Generates random colors for visualizing face-based segmentation of a SurfaceMesh.
-         * @param mesh  The surface mesh.
+         * @param mesh The surface mesh.
          * @param segments The face property storing the segmentation of the surface mesh.
          * @param colors The face property to store the colors. Must be allocated before hand.
+         * \attention The face property \c segments must have a type of \c int, \c {unsigned int}, \c std::size_t,
+         *      \c bool, or \c {unsigned char}. Besides, any negative values are treated as out of range.
          */
+        template<typename FT>
         static void color_from_segmentation(
                 SurfaceMesh *mesh,
-                const SurfaceMesh::FaceProperty<int> segments,
+                const SurfaceMesh::FaceProperty<FT> segments,
                 SurfaceMesh::FaceProperty<vec3> colors
+        );
+
+        /**
+         * @brief Generates random colors for visualizing vertex-based segmentation of a SurfaceMesh.
+         * @param mesh The surface mesh.
+         * @param segments The vertex property storing the segmentation of the surface mesh.
+         * @param colors The vertex property to store the colors. Must be allocated before hand.
+         * \attention The face property \c segments must have a type of \c int, \c {unsigned int}, \c std::size_t,
+         *      \c bool, or \c {unsigned char}. Besides, any negative values are treated as out of range.
+         */
+        template<typename FT>
+        static void color_from_segmentation(
+                SurfaceMesh *mesh,
+                const SurfaceMesh::VertexProperty<FT> segments,
+                SurfaceMesh::VertexProperty<vec3> colors
         );
 
         /**
          * @brief Generates random colors for visualizing the segmentation of a PointCloud.
          * @param cloud  The point cloud.
          * @param segments  The vertex property storing the segmentation of the point cloud.
+         * \attention The face property \c segments must have a type of \c int, \c {unsigned int}, \c std::size_t,
+         *      \c bool, or \c {unsigned char}. Besides, any negative values are treated as out of range.
          * @param colors The vertex property to store the colors. Must be allocated before hand.
          */
+        template<typename FT>
         static void color_from_segmentation(
                 PointCloud *cloud,
-                const PointCloud::VertexProperty<int> segments,
+                const PointCloud::VertexProperty<FT> segments,
                 PointCloud::VertexProperty<vec3> colors
         );
 
@@ -240,5 +263,126 @@ namespace easy3d {
     };
 
 }
+
+
+
+// ------------------------------------------- Implementation -------------------------------------------
+
+
+#include <easy3d/core/random.h>
+
+
+namespace easy3d {
+
+    template<typename FT> inline
+    void Renderer::color_from_segmentation(SurfaceMesh *model, SurfaceMesh::FaceProperty<FT> segments,
+                                           SurfaceMesh::FaceProperty<vec3> colors) {
+        if (model->empty()) {
+            LOG(WARNING) << "model has no valid geometry";
+            return;
+        }
+
+        if (!segments) {
+            LOG(WARNING) << "the surface mesh does not have face property \'" << segments.name() << "\'";
+            return;
+        }
+        if (!colors) {
+            LOG(WARNING) << "color property not allocated";
+            return;
+        }
+
+        int max_index = 0;
+        for (auto f : model->faces())
+            max_index = std::max(max_index, static_cast<int>(segments[f]));
+
+        // assign each segment a unique color
+        std::vector<vec3> color_table(max_index + 1);   // index starts from 0
+        for (auto &c : color_table)
+            c = random_color();
+
+        for (auto f : model->faces()) {
+            int idx = static_cast<int>(segments[f]);
+            if (idx == -1)
+                colors[f] = vec3(0, 0, 0);
+            else
+                colors[f] = color_table[idx];
+        }
+    }
+
+
+    template<typename FT> inline
+    void Renderer::color_from_segmentation(SurfaceMesh *model, SurfaceMesh::VertexProperty<FT> segments,
+                                           SurfaceMesh::VertexProperty<vec3> colors) {
+        if (model->empty()) {
+            LOG(WARNING) << "model has no valid geometry";
+            return;
+        }
+
+        if (!segments) {
+            LOG(WARNING) << "the surface mesh does not have vertex property \'" << segments.name() << "\'";
+            return;
+        }
+        if (!colors) {
+            LOG(WARNING) << "color property not allocated";
+            return;
+        }
+
+        int max_index = 0;
+        for (auto v : model->vertices())
+            max_index = std::max(max_index, static_cast<int>(segments[v]));
+
+        // assign each segment a unique color
+        std::vector<vec3> color_table(max_index + 1);   // index starts from 0
+        for (auto &c : color_table)
+            c = random_color();
+
+        for (auto v : model->vertices()) {
+            int idx = static_cast<int>(segments[v]);
+            if (idx == -1)
+                colors[v] = vec3(0, 0, 0);
+            else
+                colors[v] = color_table[idx];
+        }
+    }
+
+
+    template<typename FT> inline
+    void Renderer::color_from_segmentation(PointCloud *model,
+                                           const PointCloud::VertexProperty<FT> segments,
+                                           PointCloud::VertexProperty<vec3> colors) {
+        if (model->empty()) {
+            LOG(WARNING) << "model has no valid geometry";
+            return;
+        }
+
+        if (!segments) {
+            LOG(WARNING) << "the point cloud does not have vertex property \'" << segments.name() << "\'";
+            return;
+        }
+        if (!colors) {
+            LOG(WARNING) << "color property not allocated" << "\'";
+            return;
+        }
+
+        int max_index = 0;
+        for (auto v : model->vertices())
+            max_index = std::max(max_index, static_cast<int>(segments[v]));
+
+        // assign each segment a unique color
+        std::vector<vec3> color_table(max_index + 1);   // index starts from 0
+        for (auto &c : color_table)
+            c = random_color();
+
+        for (auto v : model->vertices()) {
+            int idx = static_cast<int>(segments[v]);
+            if (idx == -1)
+                colors[v] = vec3(0, 0, 0);
+            else
+                colors[v] = color_table[idx];
+        }
+    }
+
+}
+
 
 #endif  // EASY3D_RENDERER_RENDERER_H

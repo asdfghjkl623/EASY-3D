@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,13 +20,13 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include <easy3d/renderer/manipulator.h>
 #include <easy3d/core/model.h>
 #include <easy3d/renderer/manipulated_frame.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/drawable_lines.h>
 
@@ -85,7 +85,7 @@ namespace easy3d {
         const Box3 box = model_->bounding_box(false);
         const vec3 &center = box.center();
         auto manip = matrix() * mat4::translation(center) * mat4::scale(box.range(0), box.range(1), box.range(2), 1.0f);
-        opengl::draw_box_wire(drawable_model_bbox_, cam->modelViewProjectionMatrix(), manip, true);
+        shapes::draw_box_wire(drawable_model_bbox_, cam->modelViewProjectionMatrix(), manip, true);
     }
 
 }

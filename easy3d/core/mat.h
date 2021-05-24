@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_CORE_MAT_H
 #define EASY3D_CORE_MAT_H
@@ -56,8 +56,8 @@ namespace easy3d {
      * \todo Add a transform() method or overload operator* so as to allow matrices to transform vectors that are
      *	    M-1 in size, as vectors in	homogeneous space.
      *
-     *	\class Mat easy3d/core/mat.h
-     *	\see Mat2, Mat3, and Mat4
+     * \class Mat easy3d/core/mat.h
+     * \see Mat2, Mat3, and Mat4
      */
     template <size_t N, size_t M, typename T>
     class Mat
@@ -65,7 +65,8 @@ namespace easy3d {
     public:
         //	----------------- constructor and destructor -------------------
 
-        /**	\brief Default constructor.
+        /**
+         * \brief Default constructor.
          * \note The matrix elements are intentionally not initialized. This is efficient
          *       if the user assigns their values from subsequent computations. Use Mat(T s)
          *       to initialize the elements during construction. */
@@ -74,17 +75,18 @@ namespace easy3d {
         /**	\brief Initialized with diagonal as s and others zeros. */
         explicit Mat(T s);
 
-        /**	\brief Copy constructor for rN >= N, rM >= M.
-        *	For smaller incoming matrices (i.e, rN < N, rM < M ) specialization
-        *	is required in order to fill the remaining elements with appropriate
-        *	values (usually 0 or 1).
-        *	rN: Number of rows in rhs.
-        *	rM: Number of columns in rhs.
-        *	rhs: rN by rM matrix of type T to copy.
-        *	NOTE: This is explicit to prevent 'accidental' assignment of
-        *		  differently-sized matrices.
-        *	TODO: Can this ever actually get called? A templated constructor for a
-        *		templated class seems dodgy! */
+        /**
+         * \brief Copy constructor for rN >= N, rM >= M.
+         *	For smaller incoming matrices (i.e, rN < N, rM < M ) specialization
+         *	is required in order to fill the remaining elements with appropriate
+         *	values (usually 0 or 1).
+         *	rN: Number of rows in rhs.
+         *	rM: Number of columns in rhs.
+         *	rhs: rN by rM matrix of type T to copy.
+         *	NOTE: This is explicit to prevent 'accidental' assignment of
+         *		  differently-sized matrices.
+         *	TODO: Can this ever actually get called? A templated constructor for a
+         *		templated class seems dodgy! */
         template <size_t rN, size_t rM>
         explicit Mat(const Mat<rN, rM, T> &rhs);
 
@@ -289,7 +291,7 @@ namespace easy3d {
     /**
      * \brief Return the inverse of N x N (square) matrix m.
      * \note This is specialized for matrices up to 4x4 in order to achieve better performance. The general case uses
-     * Gauss-Jordan elimination.
+     *      Gauss-Jordan elimination (which uses less memory than the LU decomposition).
      */
     template <size_t N, typename T>
     Mat<N, N, T> inverse(const Mat<N, N, T> &m);
@@ -303,107 +305,119 @@ namespace easy3d {
 
     /**
      * \brief Perform Gauss-Jordan elimination to solve a set of linear equations and additionally compute the inverse
-     * of a.
-     *	a: N x N input matrix.
-     *	b: N x M input matrix containing right-hand vectors.
-     *	ainv: Output inverse of a. This may safely be the same location as a (a
-     *		  will be overwritten).
-     *	x: Output solution set. This may safely be the same location as b (b will
-     *	   be overwritten).
-     *	return true on success, false if a is a singular matrix.
+     *      of the input coefficient matrix.
+     * \param a: N x N input matrix.
+     * \param b: N x M input matrix containing right-hand vectors.
+     * \param ainv: Output inverse of a. This may safely be the same location as a (a will be overwritten).
+     * \param x: Output solution set. This may safely be the same location as b (b will be overwritten).
+     * \return \c true on success, false if a is a singular matrix.
      */
-    template <size_t N, size_t M, typename T>
-    bool gauss_jordan_elimination(
-        const Mat<N, N, T> &a,
-        const Mat<N, M, T> &b,
-        Mat<N, N, T> *ainv,
-        Mat<N, M, T> *x
-        );
-
+    template<size_t N, size_t M, typename T>
+    bool gauss_jordan_elimination(const Mat<N, N, T> &a, const Mat<N, M, T> &b, Mat<N, N, T> *ainv, Mat<N, M, T> *x);
 
     /**
-     * \brief Perform LU decomposition on a. The outputs from this method should be
-     *	used with lu_back_substitution() to solve a set of linear equations or
-     *   compute the matrix inverse or determinant.
-     *	a: N x N input matrix.
-     *	alu: Output N x N matrix, the LU decomposition of a row-wise permutation
-     *		 of a. This may safely be the same location as a (a will be overwritten).
-     *	rowp: Output row permutation data for alu.
-     *	return true on success, false if a is a singular matrix.
+     * \brief Perform LU decomposition of a square matrix.
+     * \details The outputs from this method can further be used for multiple purposes:
+     *      - with lu_back_substitution() to solve a set of linear equations;
+     *      - compute the inverse of the input matrix matrix;
+     *      - compute the determinant of the input matrix matrix.
+     * \param a: N x N input matrix.
+     * \param alu: Output N x N matrix, containing the LU decomposition of a row-wise permutation of a. This may safely
+     *      be the same location as a (a will be overwritten).
+     * \param rowp: Output row permutation data for alu.
+     * \return \c true on success, false if a is a singular matrix.
      */
-    template <size_t N, typename T>
-    bool lu_decomposition(
-        const Mat<N, N, T> &a,
-        Mat<N, N, T> *alu,
-        Vec<N, T> * rowp,
-        T *d
-        );
+    template<size_t N, typename T>
+    bool lu_decomposition(const Mat<N, N, T> &a, Mat<N, N, T> *alu, Vec<N, T> *rowp, T *d);
 
     /**
-     * \brief Solve a set of linear equations. Use outputs from lu_decomposition() as inputs.
+     * \brief Solve a set of linear equations using outputs from lu_decomposition() as inputs.
+     * \param alu: N x N matrix, which is the result of a call to lu_decomposition().
+     * \param rowp: Row permutation data for alu, which is the result of a call to lu_decomposition().
+     * \param b: N-dimensional input right-hand vector.
+     * \param x: Output N-dimensional solution set.
+     *
      *	Solve a linear system:
      *	@code
-     *	//	inputs:
-     *	Mat<N, N, T> a; // input rhs matrix
-     *	Vec<N, T> b;	// input lhs vector
-     *	//	outputs:
-     *	Mat<N, N, T> alu;		// result of LU decomposition
-     *	Vec<N, size_t> rowp;	// result row permutation data for alu
-     *	T d;	// sign of determinant
-     *	Vec<N, size_t> x;		// result solution set
-     *	...
-     *	lu_decomposition(a, &alu, &rowp, &d);	// get lu decomposition
-     *	lu_back_substitution(alu, rowp, b, &x);	// get solution set
+     *	    //	inputs:
+     *	    Mat<N, N, T> a; // input rhs matrix
+     *	    Vec<N, T> b;	// input lhs vector
+     *	    //	outputs:
+     *	    Mat<N, N, T> alu;		// result of LU decomposition
+     *	    Vec<N, size_t> rowp;	// result row permutation data for alu
+     *	    T d;	// sign of determinant
+     *	    Vec<N, size_t> x;		// result solution set
+     *	    ...
+     *	    lu_decomposition(a, &alu, &rowp, &d);	// get lu decomposition
+     *	    lu_back_substitution(alu, rowp, b, &x);	// get solution set
      *	@endcode
-     *	The last line may be repeated for any number of b vectors using the
-     *	same alu and rowp inputs.
+     *	The last line may be repeated for any number of b vectors using the same alu and rowp inputs.
      *
      *	Find the inverse of a matrix:
      *	@code
-     *	//	inputs:
-     *	Mat<N, N, T> a;		// input matrix
-     *	//	outputs:
-     *	Mat<N, N, T> alu;	// result of LU decomposition
-     *	Mat<N, N, T> ainv;	// result of inversion
-     *	Vec<N, size_t> rowp; // result row permutation data for alu
-     *	T d;	// sign of determinant
-     *	...
-     *	lu_decomposition(a, &alu, &rowp, &d); // get lu decomposition once
-     *	for (size_t i = 0; i < N; ++i) {	// find inverse by columns
-     *	Vec<N, T> b;
-     *	for (size_t j = 0; j < N; ++j)
-     *	b[j] = T(0);
-     *	b[i] = T(1);
-     *	lu_back_substitution(alu, rowp, b, &b);
-     *	ainv.set_col(i, b); // set ainv column
-     *	}
+     *	    //	inputs:
+     *	    Mat<N, N, T> a;		// input matrix
+     *	    //	outputs:
+     *	    Mat<N, N, T> alu;	// result of LU decomposition
+     *	    Mat<N, N, T> ainv;	// result of inversion
+     *	    Vec<N, size_t> rowp; // result row permutation data for alu
+     *	    T d;	// sign of determinant
+     *	    ...
+     *	    lu_decomposition(a, &alu, &rowp, &d); // get lu decomposition once
+     *	    for (size_t i = 0; i < N; ++i) {	// find inverse by columns
+     *	        Vec<N, T> b;
+     *	        for (size_t j = 0; j < N; ++j)
+     *	            b[j] = T(0);
+     *	        b[i] = T(1);
+     *	        lu_back_substitution(alu, rowp, b, &b);
+     *	        ainv.set_col(i, b); // set ainv column
+     *	    }
      *	@endcode
      *
      *	Find the determinant of a matrix:
      *	@code
-     *	//	inputs:
-     *	Mat<N, N, T> a; // input matrix
-     *	//	outpus:
-     *	Mat<N, N, T> alu; // result of LU decomposition
-     *	Vec<N, size_t> rowp; // result row permutation data for alu
-     *	T d; // output determinant
-     *	lu_decomposition(a, &alu, &rowp, &d);
-     *	for (size_t i = 0; i < N; ++i)
-     *		d *= alu(i, i);
+     *	    //	inputs:
+     *	    Mat<N, N, T> a; // input matrix
+     *	    //	outpus:
+     *	    Mat<N, N, T> alu; // result of LU decomposition
+     *	    Vec<N, size_t> rowp; // result row permutation data for alu
+     *	    T d; // output determinant
+     *	    lu_decomposition(a, &alu, &rowp, &d);
+     *	    for (size_t i = 0; i < N; ++i)
+     *	    	d *= alu(i, i);
      *	@endcode
-     *	alu: N x N matrix, the result of a call to lu_decomposition()
-     *	rowp: Row permutation data for alu.
-     *	b: N -dimensional input right-hand vector.
-     *	x: Output N -dimensional solution set.
      */
     template <size_t N, typename T>
-    void lu_back_substitution(
-        const Mat<N, N, T> &alu,
-        const Vec<N, T> &rowp,
-        const Vec<N, T> &b,
-        Vec<N, T> *x
-        );
+    void lu_back_substitution(const Mat<N, N, T> &alu, const Vec<N, T> &rowp, const Vec<N, T> &b, Vec<N, T> *x);
 
+    /**
+     * \brief Cholesky decomposition of a symmetric, positive definite matrix.
+     * \details For a symmetric, positive definite matrix A, this function computes the Cholesky factorization,
+     *      i.e. it computes a lower triangular matrix L such that A = L*L'. If the matrix is not symmetric or
+     *      positive definite, the function computes only a partial decomposition.
+     * \return \true if the input matrix is symmetric, positive definite (and then the factorization was successful).
+     */
+    template<size_t N, typename FT>
+    bool cholesky_decompose(const Mat<N, N, FT> &A, Mat<N, N, FT> &L);
+
+    /**
+     * Solve a linear system A*x = b, using the previously computed Cholesky factorization of A: L*L'.
+     * \param L: N x N matrix, which is the result of a call to cholesky_decompose().
+     * \param b: N-dimensional input right-hand vector.
+     * \param x: Output N-dimensional solution set.
+     */
+    template <size_t N, typename FT>
+    void cholesky_solve(const Mat<N, N, FT> &L, const Vec<N, FT> &b, Vec<N, FT>& x);
+
+    /**
+     * Solve a set (i.e, M) of linear systems A*X = B, using the previously computed Cholesky factorization of A: L*L'.
+     * (this function can be used to solve for the inverse of a symmetric, positive definite matrix, by using B = I).
+     * \param L: N x N matrix, which is the result of a call to cholesky_decompose().
+     * \param B: N x M right-hand matrix.
+     * \param X: Output N x M solution matrix.
+     */
+    template<size_t N, size_t M, typename T>
+    void cholesky_solve(const Mat<N, N, T> &L, const Mat<N, M, T> &B, Mat<N, M, T>& X);
 
 
     template <size_t N, size_t M, typename T>
@@ -950,8 +964,8 @@ namespace easy3d {
     /*----------------------------------------------------------------------------*/
     template <size_t N, typename T>
     inline Mat<N, N, T> inverse(const Mat<N, N, T> &m) {
-        /*	Use Gauss-Jordan elimination to find inverse. This uses less memory than
-        the LU decomposition method. */
+        // Use Gauss-Jordan elimination to find inverse. This uses less memory than the LU decomposition method.
+        // See lu_back_substitution() for an example of computing inverse using LU decomposition.
         size_t indxc[N], indxr[N], ipiv[N];
 
         Mat<N, N, T> result = m;
@@ -1288,6 +1302,77 @@ namespace easy3d {
 
 
     /*----------------------------------------------------------------------------*/
+    // Adapted from Template Numerical Toolkit.
+    template<size_t N, typename FT>
+    bool cholesky_decompose(const Mat<N, N, FT> &A, Mat<N, N, FT> &L) {
+        bool spd = true;
+        for (size_t j = 0; j < N; ++j) {
+            FT d = 0;
+            for (size_t k = 0; k < j; ++k) {
+                FT s = 0;
+                for (size_t i = 0; i < k; ++i)
+                    s += L(k, i) * L(j, i);
+
+                L(j, k) = s = (A(j, k) - s) / L(k, k);
+                d = d + s * s;
+                spd = spd && (A(k, j) == A(j, k));
+            }
+
+            d = A(j, j) - d;
+            spd = spd && (d > 0);
+
+            L(j, j) = std::sqrt(d > 0 ? d : 0);
+            for (size_t k = j + 1; k < N; ++k)
+                L(j, k) = 0;
+        }
+        return spd;
+    }
+
+    /*----------------------------------------------------------------------------*/
+    // Adapted from Template Numerical Toolkit.
+    template <size_t N, typename FT>
+    void cholesky_solve(const Mat<N, N, FT> &L, const Vec<N, FT> &b, Vec<N, FT>& x) {
+        x = b;
+        // solve L*y = b
+        for (size_t k = 0; k < N; ++k) {
+            for (size_t i = 0; i < k; ++i)
+                x[k] -= x[i] * L(k, i);
+            x[k] /= L(k, k);
+        }
+
+        // solve L'*x = y
+        for (int k = N - 1; k >= 0; --k) {  // attention: size_t will not work
+            for (size_t i = k + 1; i < N; ++i)
+                x[k] -= x[i] * L(i, k);
+            x[k] /= L(k, k);
+        }
+    }
+
+    template<size_t N, size_t M, typename T>
+    void cholesky_solve(const Mat<N, N, T> &L, const Mat<N, M, T> &B, Mat<N, M, T> &X) {
+        X = B;
+        // solve L_*Y = B
+        for (size_t j = 0; j < M; ++j) {
+            for (size_t k = 0; k < N; ++k) {
+                for (size_t i = 0; i < k; ++i)
+                    X(k, j) -= X(i, j) * L(k, i);
+
+                X(k, j) /= L(k, k);
+            }
+        }
+
+        // solve L'*X = Y
+        for (size_t j = 0; j < M; ++j) {
+            for (int k = N - 1; k >= 0; --k) {  // attention: size_t will not work
+                for (size_t i = k + 1; i < N; ++i)
+                    X(k, j) -= X(i, j) * L(i, k);
+
+                X(k, j) /= L(k, k);
+            }
+        }
+    }
+
+    /*----------------------------------------------------------------------------*/
 
     template <size_t N, size_t M, typename T> inline
     std::ostream& operator<< (std::ostream& output, const Mat<N, M, T>& m) {
@@ -1317,6 +1402,22 @@ namespace easy3d {
 
     /*----------------------------------------------------------------------------*/
 
+    /** \brief Convert a N-dimensional vector into a N by 1 matrix. */
+    template<size_t N, typename FT>
+    Mat<N, 1, FT> to_matrix(const Vec<N, FT>& v) {
+        return Mat<N, 1, FT>(v.data());
+    }
+
+
+    /**	\brief Construct a 1 by N matrix from a N-dimensional vector. */
+    template<size_t N, typename FT>
+    Mat<1, N, FT> transpose(const Vec<N, FT>& v) {
+        return Mat<1, N, FT>(v.data());
+    }
+
+    /*----------------------------------------------------------------------------*/
+
+    /**	\brief Test if a matrix has NaN entry. */
     template <size_t N, size_t M, typename T>
     inline bool has_nan(const Mat<N, M, T>& m) {
         for (int i = 0; i < N; i++) {
@@ -1388,8 +1489,8 @@ namespace easy3d {
 
         /**
          * \brief Static constructor return a 2D rotation matrix.
-         *	@param angle Angle of rotation in radians.
-         *	\note Positive values of angle rotate counter-clockwise as per the right-hand rule.
+         * \param angle Angle of rotation in radians.
+         * \note Positive values of angle rotate counter-clockwise as per the right-hand rule.
          */
         static Mat2<T> rotation(T angle);
 
@@ -1573,7 +1674,7 @@ namespace easy3d {
 
         /**
          * \brief Static constructor returning a 3D uniform scale matrix.
-         *	@param s x, y, z scale (uniform).
+         * \param s x, y, z scale (uniform).
          */
         static Mat3<T> scale(T s);
 
@@ -1587,21 +1688,21 @@ namespace easy3d {
 
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by its axis and angle.
-         *        @param axis: Axis of rotation. This MUST be normalized.
-         *        @param angle: Angle of rotation in radians. Positive values of angle
-         *             rotate counter-clockwise about axis as per the right-hand rule.
-         *  \note The axis defines only the direction of the rotation axis, i.e., the
-         *        rotation is about the axis passing through the origin.
+         * @param axis: Axis of rotation. This MUST be normalized.
+         * @param angle: Angle of rotation in radians. Positive values of angle
+         *      rotate counter-clockwise about axis as per the right-hand rule.
+         * \note The axis defines only the direction of the rotation axis, i.e., the
+         *      rotation is about the axis passing through the origin.
          */
         static Mat3<T> rotation(const Vec<3, T> &axis, T angle);
         
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by the axis–angle
-         *  representation. Both the axis and the angle are represented by a vector
-         *  codirectional with the rotation axis whose length is the rotation angle.
-         *      @param axis_angle: direction is the axis and length is the angle (in radian)
-         *  \note The axis defines only the direction of the rotation axis, i.e., the
-         *        rotation is about the axis passing through the origin.
+         *      representation. Both the axis and the angle are represented by a vector
+         *      codirectional with the rotation axis whose length is the rotation angle.
+         * @param axis_angle: direction is the axis and length is the angle (in radian)
+         * \note The axis defines only the direction of the rotation axis, i.e., the
+         *      rotation is about the axis passing through the origin.
          */
         static Mat3<T> rotation(const Vec<3, T> &axis_angle);
         
@@ -1612,9 +1713,9 @@ namespace easy3d {
         
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by Euler angles.
-         * The three rotations are applied successively.
-         *        @param x, y, z: the rotation angles (in radians) around X, Y, and Z axes respectively.
-         *        @param order: the order of the rotations to be applied. 1 first and 3 for last.
+         *      The three rotations are applied successively.
+         * @param x, y, z: the rotation angles (in radians) around X, Y, and Z axes respectively.
+         * @param order: the order of the rotations to be applied. 1 first and 3 for last.
          * \note Using a different order yields different results. The default order is first Y, then Z, then X.
          */
         static Mat3<T> rotation(T x, T y, T z, int order = 312);
@@ -1813,8 +1914,8 @@ namespace easy3d {
             case 123:   return rz * ry * rx;
             case 132:   return ry * rz * rx;
             case 213:   return rz * rx * ry;
-            case 312:   return rx * rz * ry;
-            case 231:   return ry * rx * rz;
+            case 231:   return rx * rz * ry;
+            case 312:   return ry * rx * rz;
             case 321:   return rx * ry * rz;
             default:
                 LOG(ERROR) << "invalid rotation order";
@@ -1889,37 +1990,37 @@ namespace easy3d {
 
         /**
          * \brief Static constructor returning a 4D uniform scale matrix.
-         *	@param s x, y, z, w scale (uniform).
+         * \param s x, y, z, w scale (uniform).
          */
         static Mat4<T> scale(T s);
 
         /**
          * \brief Static constructor returning a 4D non-uniform scale matrix,
-         *  @param x x scale.
-         *  @param y y scale.
-         *  @param z z scale.
-         *  @param w w scale.
+         * \param x x scale.
+         * \param y y scale.
+         * \param z z scale.
+         * \param w w scale.
          */
         static Mat4<T> scale(const Vec<4, T>& s);  // set w to 1 for 3D scaling
         static Mat4<T> scale(T x, T y, T z, T w);  // set w to 1 for 3D scaling
         
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by its axis and angle.
-         *	    @param axis: Axis of rotation. This MUST be normalized.
-         *	    @param angle: Angle of rotation in radians. Positive values of angle
-         *             rotate counter-clockwise about axis as per the right-hand rule.
-         *  \note The axis defines only the direction of the rotation axis, i.e., the
-         *        rotation is about the axis passing through the origin.
+         * \param axis: Axis of rotation. This MUST be normalized.
+         * \param angle: Angle of rotation in radians. Positive values of angle
+         *      rotate counter-clockwise about axis as per the right-hand rule.
+         * \note The axis defines only the direction of the rotation axis, i.e., the
+         *      rotation is about the axis passing through the origin.
          */
         static Mat4<T> rotation(const Vec<3, T> &axis, T angle);
         
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by the axis–angle
-         * representation. Both the axis and the angle are represented by a vector
-         * codirectional with the rotation axis whose length is the rotation angle.
-         *      @param axis_angle: direction is the axis and length is the angle (in radian)
+         *      representation. Both the axis and the angle are represented by a vector
+         *      codirectional with the rotation axis whose length is the rotation angle.
+         * \param axis_angle: direction is the axis and length is the angle (in radian)
          * \note The axis defines only the direction of the rotation axis, i.e., the
-         *        rotation is about the axis passing through the origin.
+         *      rotation is about the axis passing through the origin.
          */
         static Mat4<T> rotation(const Vec<3, T> &axis_angle);
 
@@ -1931,11 +2032,11 @@ namespace easy3d {
 
         /**
          * \brief Static constructor returning a 3D rotation matrix defined by Euler angles.
-         * The three rotations are applied successively.
-         *	    @param x, y, z: the rotation angles (in radians) around X, Y, and Z axes respectively.
-         *      @param order: the order of the rotations to be applied. 1 first and 3 for last.
+         *      The three rotations are applied successively.
+         * \param x, y, z: the rotation angles (in radians) around X, Y, and Z axes respectively.
+         * \param order: the order of the rotations to be applied. 1 first and 3 for last.
          * \note Using a different order yields different results. The default order is first Y, then Z, then X.
-         *         See http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-17-quaternions/
+         *      See http://www.opengl-tutorial.org/intermediate-tutorials/tutorial-17-quaternions/
          */
         static Mat4<T> rotation(T x, T y, T z, int order = 312);
 
@@ -2100,10 +2201,10 @@ namespace easy3d {
     template <typename T>
     inline Mat4<T> Mat4<T>::scale(const Vec<4, T>& s) {
         return Mat4<T>(
-            s(0), T(0), T(0), T(0),
-            T(0), s(1), T(0), T(0),
-            T(0), T(0), s(2), T(0),
-            T(0), T(0), T(0), s(3)
+            s.x,  T(0), T(0), T(0),
+            T(0), s.y,  T(0), T(0),
+            T(0), T(0), s.z,  T(0),
+            T(0), T(0), T(0), s.w
             );
     }
 
@@ -2112,7 +2213,7 @@ namespace easy3d {
     template <typename T>
     inline Mat4<T> Mat4<T>::rotation(const Vec<3, T> &axis, T angle) {
         assert(std::abs(axis.length() - 1) < epsilon<T>());
-        return Mat4<T>(Mat3<T>::rotation(axis, angle)); // gen 3x3 rotation matrix as arg to Mat4 constructo
+        return Mat4<T>(Mat3<T>::rotation(axis, angle)); // gen 3x3 rotation matrix as arg to Mat4 constructor
     }
     
     /*----------------------------------------------------------------------------*/
@@ -2168,8 +2269,8 @@ namespace easy3d {
             case 123:   return rz * ry * rx;
             case 132:   return ry * rz * rx;
             case 213:   return rz * rx * ry;
-            case 312:   return rx * rz * ry;
-            case 231:   return ry * rx * rz;
+            case 231:   return rx * rz * ry;
+            case 312:   return ry * rx * rz;
             case 321:   return rx * ry * rz;
             default:
                 LOG(ERROR) << "invalid rotation order";

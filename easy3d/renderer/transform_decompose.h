@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY_RENDERER_TRANSFORM_DECOMPOSE_H
 #define EASY_RENDERER_TRANSFORM_DECOMPOSE_H
@@ -53,12 +53,12 @@ namespace easy3d {
     namespace transform {
 
         /**
-         * @brief Decomposes a transformation matrix into its original components
+         * @brief Decomposes a transformation matrix (M = translation * rotation * scaling) into its original components.
          *  @param M is the input transformation matrix
          *  @param scaling receives the output scaling for the x, y, z axes
          *  @param rotation receives the output rotation
          *  @param translation receives the output translation for the x, y, z axes
-         * \note This function can not handle skew and perspective transformation. See the overloaded function below
+         * \note This function cannot handle skew and perspective transformation. See the overloaded function below.
          * \todo Add functions that extract single components, i.e.,
          *      - Quat extract_rotation(const mat4& M);
          *      - vec3 extract_scale(const mat4& M);
@@ -68,10 +68,10 @@ namespace easy3d {
         void decompose(const mat4& M, vec3& scaling, quat& rotation, vec3& translation);
 
         /**
-         * @brief Decomposes a transformation matrix with no scaling into its original components
+         * @brief Decomposes a transformation matrix without scaling (M = translation * rotation) into its original components.
          *  @param rotation receives the output rotation
          *  @param translation receives the output translation for the x, y, z axes
-         * \note This function can not handle skew and perspective transformation. See the overloaded function below
+         * \note This function cannot handle rotation, skew, and perspective transformation. See the overloaded function below.
          * \todo Add functions that extract single components, i.e.,
          *      - Quat  extract_rotation(const mat4& M);
          *      - vec3  extract_translation(const mat4& M);
@@ -81,7 +81,8 @@ namespace easy3d {
 
         /**
          * \brief Decomposes a transformation matrix into to its original components (i.e., scaling, rotation,
-         * translation, skew and perspective).
+         *      translation, skew and perspective).
+         * \todo Not tested yet.
          */
         bool decompose(const mat4& M, vec3& scaling, quat& rotation, vec3& translation, vec3& skew, vec4& persp);
 

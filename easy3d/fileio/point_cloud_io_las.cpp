@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/fileio/point_cloud_io.h>
 
@@ -29,8 +29,8 @@
 #include <climits>  // for USHRT_MAX
 
 #include <easy3d/core/point_cloud.h>
-#include <3rd_party/LAStools/LASlib/inc/lasreader.hpp>
-#include <3rd_party/LAStools/LASlib/inc/laswriter.hpp>
+#include <3rd_party/lastools/LASlib/inc/lasreader.hpp>
+#include <3rd_party/lastools/LASlib/inc/laswriter.hpp>
 
 
 namespace easy3d {
@@ -105,9 +105,9 @@ namespace easy3d {
 
             auto trans = cloud->add_model_property<mat4>("transformation", mat4::identity());
             trans[0] = mat4::translation(-x0, -y0, -z0);
-            LOG_IF(transform, INFO) << "model transformed w.r.t. its first point ("
-                                    << x0 << " " << y0 << " " << z0
-                                    << "), stored as ModelProperty<mat4>(\"transformation\")";
+            LOG_IF(transform, WARNING) << "model transformed w.r.t. its first point ("
+                                       << x0 << " " << y0 << " " << z0
+                                       << "), stored as ModelProperty<mat4>(\"transformation\")";
 
             lasreader->close();
             delete lasreader;

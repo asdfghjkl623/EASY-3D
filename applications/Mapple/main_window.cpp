@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "main_window.h"
@@ -40,6 +40,7 @@
 #include <QPushButton>
 #include <QProgressBar>
 
+#include <easy3d/core/version.h>
 #include <easy3d/core/surface_mesh.h>
 #include <easy3d/core/graph.h>
 #include <easy3d/core/point_cloud.h>
@@ -252,14 +253,9 @@ void MainWindow::send(el::Level level, const std::string &msg) {
 void MainWindow::createStatusBar()
 {
     labelStatusInfo_ = new QLabel("Ready", this);
-    labelStatusInfo_->setFixedWidth(static_cast<int>(ui->dockWidgetRendering->width() * 0.7f));
+    labelStatusInfo_->setFixedWidth(static_cast<int>(ui->dockWidgetRendering->width() * 2.0f));
     labelStatusInfo_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
     statusBar()->addWidget(labelStatusInfo_);
-
-    labelPointUnderMouse_ = new QLabel(this);
-    labelPointUnderMouse_->setFixedWidth(300);
-    labelPointUnderMouse_->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-    statusBar()->addWidget(labelPointUnderMouse_);
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -611,12 +607,6 @@ void MainWindow::setShowSelectedOnly(bool b) {
 }
 
 
-void MainWindow::setPointUnderMouse(const QString &text) {
-	labelPointUnderMouse_->setText(text);
-    labelPointUnderMouse_->update();
-}
-
-
 WidgetModelList* MainWindow::widgetModelList() const {
     return ui->treeWidgetModels;
 }
@@ -746,7 +736,7 @@ void MainWindow::onAbout()
     title += QMessageBox::tr("<h3>Mapple (%1 bit)</h3>").arg(bits);
 #endif
 
-    title += QMessageBox::tr("<h4>Version %1</h4>").arg(PROJECT_VERSION);
+    title += QMessageBox::tr("<h4>Version %1</h4>").arg(version().c_str());
 
     QString text = QMessageBox::tr(
             "<p>Mapple is software for processing and rendering 3D data (e.g., point clouds, graphs, surface meshes, "
@@ -866,8 +856,9 @@ void MainWindow::createActionsForFileMenu() {
 
 
 void MainWindow::createActionsForViewMenu() {
-    connect(ui->actionShowFaceVertexLabelsUnderMouse, SIGNAL(toggled(bool)), viewer_, SLOT(showFaceVertexLabelsUnderMouse(bool)));
-    connect(ui->actionShowCordinatesUnderMouse, SIGNAL(toggled(bool)), viewer_, SLOT(showCordinatesUnderMouse(bool)));
+    connect(ui->actionShowPrimitiveIDUnderMouse, SIGNAL(toggled(bool)), viewer_, SLOT(showPrimitiveIDUnderMouse(bool)));
+    connect(ui->actionShowPrimitivePropertyUnderMouse, SIGNAL(toggled(bool)), this, SLOT(showPrimitivePropertyUnderMouse(bool)));
+    connect(ui->actionShowCordinatesUnderMouse, SIGNAL(toggled(bool)), this, SLOT(showCoordinatesUnderMouse(bool)));
 
     connect(ui->actionShowEasy3DLogo, SIGNAL(toggled(bool)), viewer_, SLOT(showEasy3DLogo(bool)));
     connect(ui->actionShowFrameRate, SIGNAL(toggled(bool)), viewer_, SLOT(showFrameRate(bool)));
@@ -913,6 +904,7 @@ void MainWindow::createActionsForPropertyMenu() {
     connect(ui->actionManipulateProperties, SIGNAL(triggered()), this, SLOT(manipulateProperties()));
     connect(ui->actionComputeHeightField, SIGNAL(triggered()), this, SLOT(computeHeightField()));
     connect(ui->actionComputeSurfaceMeshCurvatures, SIGNAL(triggered()), this, SLOT(computeSurfaceMeshCurvatures()));
+    connect(ui->actionTopologyStatistics, SIGNAL(triggered()), this, SLOT(reportTopologyStatistics()));
 }
 
 
@@ -952,12 +944,11 @@ void MainWindow::createActionsForPointCloudMenu() {
     connect(ui->actionPoissonSurfaceReconstruction, SIGNAL(triggered()), this, SLOT(pointCloudPoissonSurfaceReconstruction()));
 
     connect(ui->actionDelaunayTriangulation2D, SIGNAL(triggered()), this, SLOT(pointCloudDelaunayTriangulation2D()));
-    connect(ui->actionDelaynayTriangulation3D, SIGNAL(triggered()), this, SLOT(pointCloudDelaunayTriangulation3D()));
+    connect(ui->actionDelaunayTriangulation3D, SIGNAL(triggered()), this, SLOT(pointCloudDelaunayTriangulation3D()));
 }
 
 
 void MainWindow::createActionsForSurfaceMeshMenu() {
-    connect(ui->actionTopologyStatistics, SIGNAL(triggered()), this, SLOT(surfaceMeshReportTopologyStatistics()));
     connect(ui->actionExtractConnectedComponents, SIGNAL(triggered()), this, SLOT(surfaceMeshExtractConnectedComponents()));
     connect(ui->actionPlanarPartition, SIGNAL(triggered()), this, SLOT(surfaceMeshPlanarPartition()));
     connect(ui->actionPolygonization, SIGNAL(triggered()), this, SLOT(surfaceMeshPolygonization()));
@@ -1032,56 +1023,70 @@ void MainWindow::operationModeChanged(QAction* act) {
 }
 
 
-void MainWindow::surfaceMeshReportTopologyStatistics() {
+void MainWindow::reportTopologyStatistics() {
     SurfaceMesh *mesh = dynamic_cast<SurfaceMesh *>(viewer()->currentModel());
-    if (!mesh)
-        return;
+    if (mesh) {
+        std::stringstream stream;
 
-    std::stringstream stream;
+        const auto &components = SurfaceMeshComponent::extract(mesh);
+        stream << "model has " << components.size() << " connected components";
 
-    const auto &components = SurfaceMeshComponent::extract(mesh);
-    stream << "model has " << components.size() << " connected components";
-
-    // count isolated vertices
-    std::size_t count = 0;
-    for (auto v : mesh->vertices()) {
-        if (mesh->is_isolated(v))
-            ++count;
-    }
-    if (count > 0)
-        stream << "and " << count << " isolated vertices";
-    stream << std::endl;
-
-    const std::size_t num = 10;
-    if (components.size() > num)
-        stream << "    topology of the first " << num << " components:" << std::endl;
-
-    for (std::size_t i = 0; i < std::min(components.size(), num); ++i) {
-        const SurfaceMeshComponent& comp = components[i];
-        SurfaceMeshTopology topo(&comp);
-        std::string type = "unknown";
-        if (topo.is_sphere())
-            type = "sphere";
-        else if (topo.is_disc())
-            type = "disc";
-        else if (topo.is_cylinder())
-            type = "cylinder";
-        else if (topo.is_torus())
-            type = "torus";
-        else if (topo.is_closed())
-            type = "unknown closed";
-
-        stream << "        " << i << ": " << type
-                  << ", F = " << comp.n_faces() << ", V = " << comp.n_vertices() << ", E = " << comp.n_edges()
-                  << ", B = " << topo.number_of_borders();
-        if (topo.number_of_borders() == 1)
-            stream << ", border size = " << topo.largest_border_size();
-        else if (topo.number_of_borders() > 1)
-            stream << ", largest border size = " << topo.largest_border_size();
+        // count isolated vertices
+        std::size_t count = 0;
+        for (auto v : mesh->vertices()) {
+            if (mesh->is_isolated(v))
+                ++count;
+        }
+        if (count > 0)
+            stream << "and " << count << " isolated vertices";
         stream << std::endl;
+
+        const std::size_t num = 10;
+        if (components.size() > num)
+            stream << "    topology of the first " << num << " components:" << std::endl;
+
+        for (std::size_t i = 0; i < std::min(components.size(), num); ++i) {
+            const SurfaceMeshComponent &comp = components[i];
+            SurfaceMeshTopology topo(&comp);
+            std::string type = "unknown";
+            if (topo.is_sphere())
+                type = "sphere";
+            else if (topo.is_disc())
+                type = "disc";
+            else if (topo.is_cylinder())
+                type = "cylinder";
+            else if (topo.is_torus())
+                type = "torus";
+            else if (topo.is_closed())
+                type = "unknown closed";
+
+            stream << "        " << i << ": " << type
+                   << ", F = " << comp.n_faces() << ", V = " << comp.n_vertices() << ", E = " << comp.n_edges()
+                   << ", B = " << topo.number_of_borders();
+            if (topo.number_of_borders() == 1)
+                stream << ", border size = " << topo.largest_border_size();
+            else if (topo.number_of_borders() > 1)
+                stream << ", largest border size = " << topo.largest_border_size();
+            stream << std::endl;
+        }
+
+        LOG(INFO) << stream.str();
     }
 
-    LOG(INFO) << stream.str();
+    Graph *graph = dynamic_cast<Graph *>(viewer()->currentModel());
+    if (graph) {
+        std::stringstream stream;
+        stream << "graph has " << graph->n_vertices() << " vertices and " << graph->n_edges() << " edges" << std::endl;
+
+        std::map<int, int> count; // key (i.e., first element) is the valence
+        for (auto v : graph->vertices())
+            ++count[graph->valence(v)];
+
+        for (const auto& elem : count)
+            stream << "    number of degree " << elem.first << " vertices: " << elem.second << std::endl;
+
+        LOG(INFO) << stream.str();
+    }
 }
 
 
@@ -1129,7 +1134,7 @@ void MainWindow::surfaceMeshRepairPolygonSoup() {
     viewer_->update();
     updateUi();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1204,7 +1209,7 @@ void MainWindow::surfaceMeshOrientClosedTriangleMesh() {
     viewer_->update();
     updateUi();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1265,7 +1270,7 @@ void MainWindow::surfaceMeshRemoveDuplicateAndFoldingFaces() {
     LOG(INFO) << "done. " << num_degenerate + num_overlapping << " faces deleted (" << num_degenerate
               << " degenerate, " << num_overlapping << " overlapping). " << w.time_string();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1281,12 +1286,25 @@ void MainWindow::surfaceMeshDetectSelfIntersections() {
 	LOG(INFO) << "detecting intersecting faces...";
 
     const auto& pairs = Surfacer::detect_self_intersections(mesh);
-    if (!pairs.empty())
-		LOG(INFO) << "done. " << pairs.size() << " pairs of faces intersect. " << w.time_string();
-    else
-		LOG(INFO) << "done. No intersecting faces detected. " << w.time_string();
+    if (pairs.empty())
+        LOG(INFO) << "done. No intersecting faces detected. " << w.time_string();
+    else {
+        auto select = mesh->get_face_property<bool>("f:select");
+        if (select)
+            select.vector().resize(mesh->n_faces(), false);
+        else
+            select = mesh->add_face_property<bool>("f:select", false);
+
+        for (const auto& pair : pairs) {
+            select[pair.first] = true;
+            select[pair.second] = true;
+        }
+
+        LOG(INFO) << "done. " << pairs.size() << " pairs of faces intersect (marked in face property 'f:select'). " << w.time_string();
+        updateRenderingPanel();
+    }
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
  }
 
@@ -1311,7 +1329,7 @@ void MainWindow::surfaceMeshRemeshSelfIntersections() {
     else
 		LOG(INFO) << "done. No intersecting faces detected. " << w.time_string();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1334,7 +1352,7 @@ void MainWindow::surfaceMeshClip() {
     viewer_->update();
     updateUi();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1357,7 +1375,7 @@ void MainWindow::surfaceMeshSplit() {
     viewer_->update();
     updateUi();
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1454,7 +1472,7 @@ void MainWindow::surfaceMeshSlice() {
 #endif
 
 #else
-    LOG(WARNING) << "This function requires CGAL but CGAL was not found.";
+    LOG(WARNING) << "This function requires CGAL but CGAL was not found when Easy3D was built.";
 #endif
 }
 
@@ -1999,6 +2017,20 @@ void MainWindow::animation() {
         m->renderer()->set_selected(false);
 
     dialog->show();
+}
+
+
+void MainWindow::showPrimitivePropertyUnderMouse(bool b) {
+    if (b)
+        ui->actionShowCordinatesUnderMouse->setChecked(false);
+    viewer_->showPrimitivePropertyUnderMouse(b);
+}
+
+
+void MainWindow::showCoordinatesUnderMouse(bool b) {
+    if (b)
+        ui->actionShowPrimitivePropertyUnderMouse->setChecked(false);
+    viewer_->showCoordinatesUnderMouse(b);
 }
 
 

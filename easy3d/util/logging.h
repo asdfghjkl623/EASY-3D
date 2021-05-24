@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,17 +20,14 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_UTIL_LOGGING_H
 #define EASY3D_UTIL_LOGGING_H
 
 
-#include <easy3d/util/easylogging++.h>
+#include <3rd_party/easyloggingpp/src/easylogging++.h>
 
-
-// to have the same syntax as glog
-#define LOG_FIRST_N LOG_N_TIMES
 
 // to have LOG_IF_EVERY_N
 #define LOG_IF_EVERY_N(n, condition, LEVEL)  if (condition) \
@@ -64,6 +61,9 @@ namespace easy3d {
          * @note This initialization is optional. If not called, log messages will be written to stderr only.
          */
         void initialize(bool info_to_stderr = false, const std::string &log_file = "", int verbosity_threshold = 0);
+
+        /// Returns whether the logging has been initialized.
+        bool is_initialized();
 
         /// Returns the full path of the log file (empty if no log file has been created).
         std::string log_file();

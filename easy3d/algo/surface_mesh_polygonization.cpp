@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/algo/surface_mesh_polygonization.h>
 #include <easy3d/algo/surface_mesh_enumerator.h>
@@ -46,7 +46,7 @@ namespace easy3d {
 
         int current_faces = mesh->n_faces();
         if (current_faces < orig_faces)
-            LOG(INFO) << orig_faces << " faces merged into " << current_faces << std::endl;
+            LOG(INFO) << orig_faces << " faces merged into " << current_faces;
     }
 
 
@@ -109,7 +109,7 @@ namespace easy3d {
             }
             auto f = builder.add_face(vts);
             if (!f.is_valid()) {
-                LOG_FIRST_N(3, WARNING) << "failed to add a face to the surface mesh. " << COUNTER;
+                LOG_N_TIMES(3, WARNING) << "failed to add a face to the surface mesh. " << COUNTER;
                 break;
             }
         }

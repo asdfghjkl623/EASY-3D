@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "main_window.h"
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
     try {
         MainWindow win;
         if (!logging::log_file().empty())
-            LOG(INFO) << "use log file: " << logging::log_file();
+            LOG(INFO) << "log file: " << logging::log_file();
 
         win.show();
 

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/shadow.h>
 #include <easy3d/renderer/shader_manager.h>
@@ -163,8 +163,8 @@ namespace easy3d {
         const float offset_y = 40.0f;
         const float size = 200.0f;
         const Rect quad(offset_x * dpi_scale, (offset_x + size) * dpi_scale, offset_y * dpi_scale, (offset_y + size) * dpi_scale);
-        opengl::draw_depth_texture(quad, fbo_->depth_texture(), w, h, -0.9f);
-        opengl::draw_quad_wire(quad, vec4(1.0f, 0.0f, 0.0f, 1.0f), w, h, -0.99f);   easy3d_debug_log_gl_error;
+        shapes::draw_depth_texture(quad, fbo_->depth_texture(), w, h, -0.9f);
+        shapes::draw_quad_wire(quad, vec4(1.0f, 0.0f, 0.0f, 1.0f), w, h, -0.99f);   easy3d_debug_log_gl_error;
         draw_light_frustum();		easy3d_debug_log_gl_error;
     #endif
     }

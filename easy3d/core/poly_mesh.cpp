@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include <easy3d/core/poly_mesh.h>
@@ -569,11 +569,25 @@ namespace easy3d {
     {
         const auto& vts = vertices(f);
 
-        const vec3& p0 = vpoint_[vts[0]];
-        const vec3& p1 = vpoint_[vts[1]];
-        const vec3& p2 = vpoint_[vts[2]];
+        if (vts.size() == 3) { // face is a triangle
+            const vec3& p0 = vpoint_[vts[0]];
+            const vec3& p1 = vpoint_[vts[1]];
+            const vec3& p2 = vpoint_[vts[2]];
+            return cross(p2 - p1, p0 - p1).normalize();
+        }
+        else {// face is a general polygon
+            vec3 n(0,0,0);
 
-        return cross(p2-p1, p0-p1).normalize();
+            for (std::size_t id = 0; id < vts.size(); ++id) {
+                int id_prev = (id - 1 + vts.size()) % vts.size();
+                int id_next = (id + 1 + vts.size()) % vts.size();
+                vec3 p0 = vpoint_[vts[id_prev]];
+                vec3 p1 = vpoint_[vts[id]];
+                vec3 p2 = vpoint_[vts[id_next]];
+                n += cross(p2 - p1, p0 - p1).normalize();
+            }
+            return n.normalize();
+        }
     }
 
 
@@ -582,6 +596,7 @@ namespace easy3d {
     {
         auto vnormal = vertex_property<vec3>("v:normal");
 
+        // always re-compute face normals
         update_face_normals();
         auto fnormal = get_face_property<vec3>("f:normal");
 

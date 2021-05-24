@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 #include <easy3d/renderer/camera.h>
@@ -38,6 +38,8 @@ CameraIntrepolation::CameraIntrepolation(const std::string& title)
     : Viewer(title)
 {
     interpolator_ = new KeyFrameInterpolator(camera_->frame());
+    // update the viewer when the interpolation finishes
+    easy3d::connect(&interpolator_->interpolation_stopped, (Viewer*)this, &Viewer::update);
 }
 
 
@@ -60,12 +62,15 @@ bool CameraIntrepolation::key_press_event(int key, int modifiers)
 {
     if (key == GLFW_KEY_K && modifiers == 0) {
         easy3d::Frame *frame = camera()->frame();
-        interpolator_->add_keyframe(*frame);
-        float dist = distance(camera_->sceneCenter(), frame->position());
-        if (dist > camera_->sceneRadius())
-            camera_->setSceneRadius(dist);
-        std::cout << "Key frame added" << std::endl;
-        return true;
+        if (interpolator_->add_keyframe(*frame)) {
+            float dist = distance(camera_->sceneCenter(), frame->position());
+            if (dist > camera_->sceneRadius())
+                camera_->setSceneRadius(dist);
+            std::cout << "Key frame added" << std::endl;
+            return true;
+        }
+        else
+            return false;
     }
     else if (key == GLFW_KEY_SPACE && modifiers == 0) {
         if (interpolator_->is_interpolation_started()) {
@@ -74,7 +79,8 @@ bool CameraIntrepolation::key_press_event(int key, int modifiers)
         }
         else {
             interpolator_->start_interpolation();
-            std::cout << "Animation started." << std::endl;
+            if (interpolator_->is_interpolation_started())
+                std::cout << "Animation started." << std::endl;
         }
         return true;
     }

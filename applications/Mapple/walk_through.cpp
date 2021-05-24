@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "walk_through.h"
@@ -49,15 +49,15 @@ WalkThrough::~WalkThrough() {
 
 
 void WalkThrough::add_keyframe(const Frame &frame) {
-    kfi_->add_keyframe(frame);
+    if (kfi_->add_keyframe(frame)) {
+        // update scene radius to make sure the path is within the view frustum
+        float dist = distance(camera_->sceneCenter(), frame.position());
+        if (dist > camera_->sceneRadius())
+            camera_->setSceneRadius(dist);
 
-    // update scene radius to make sure the path is within the view frustum
-    float dist = distance(camera_->sceneCenter(), frame.position());
-    if (dist > camera_->sceneRadius())
-        camera_->setSceneRadius(dist);
-
-    LOG(INFO) << "a key frame added to camera path";
-    path_modified.send();
+        LOG(INFO) << "a key frame added to camera path";
+        path_modified.send();
+    }
 }
 
 

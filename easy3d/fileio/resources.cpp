@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/fileio/resources.h>
 #include <easy3d/util/file_system.h>
@@ -32,28 +32,42 @@ namespace easy3d {
 
         // resource directory (containing color maps, shaders, textures, etc.)
         std::string directory() {
-            std::string parent = file_system::executable_directory();
-            std::string dir = parent + "/resources";
-            if (file_system::is_directory(dir))
+            // first check if the resources has been defined in the
+            std::string dir = EASY3D_RESOURCES_DIR;
+            if (file_system::is_directory(dir)) {
+                VLOG_N_TIMES(1, 1) << "resources directory: " << dir;
                 return dir;
+            }
+
+            std::string parent = file_system::executable_directory();
+            dir = parent + "/resources";
+            if (file_system::is_directory(dir)) {
+                VLOG_N_TIMES(1, 1) << "resources directory: " << dir;
+                return dir;
+            }
             else {
                 // For macOS, if reached here, we may need to move "up" three times, because
                 // macOS puts the executable file in an application bundle, e.g.,
                 // "PolyFit.app/Contents/MacOS/PolyFit". Some IDEs may also put the 'exe' in
                 // Debug/Release subfolder, so we may try four times up at most.
                 parent = file_system::parent_directory(parent);
-                std::string dir = parent + "/resources";
-                if (file_system::is_directory(dir))
+                dir = parent + "/resources";
+                if (file_system::is_directory(dir)) {
+                    VLOG_N_TIMES(1, 1) << "resources directory: " << dir;
                     return dir;
+                }
                 else {
                     for (int i = 0; i < 4; ++i) {
                         parent = file_system::parent_directory(parent);
-                        std::string dir = parent + "/resources";
-                        if (file_system::is_directory(dir))
+                        dir = parent + "/resources";
+                        if (file_system::is_directory(dir)) {
+                            VLOG_N_TIMES(1, 1) << "resources directory: " << dir;
                             return dir;
+                        }
                     }
                 }
-                // if still could not find it, return the current working directory
+                // if still could not find it, show an error and return the current working directory
+                LOG_N_TIMES(1, ERROR) << "could not find the resources directory";
                 return file_system::current_working_directory();
             }
         }

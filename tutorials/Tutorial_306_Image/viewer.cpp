@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,12 +20,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 
 #include <easy3d/renderer/texture.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/util/dialogs.h>
 #include <easy3d/fileio/resources.h>
 
@@ -148,5 +148,5 @@ void ImageViewer::draw() const {
     compute_image_region(x, y, w, h);
 
     const Rect quad(x, x + w, y, y + h);
-    opengl::draw_quad_filled(quad, texture_->id(), width(), height(), -0.9f);
+    shapes::draw_quad_filled(quad, texture_->id(), width(), height(), -0.9f);
 }

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include <easy3d/gui/picker_surface_mesh.h>
@@ -62,7 +62,7 @@ namespace easy3d {
             }
             if (!program) {
                 use_gpu_if_supported_ = false;
-                LOG_FIRST_N(3, ERROR) << "shader program not available, fall back to CPU implementation. " << COUNTER;
+                LOG_N_TIMES(3, ERROR) << "shader program not available, fall back to CPU implementation. " << COUNTER;
             }
         }
 
@@ -243,7 +243,7 @@ namespace easy3d {
     SurfaceMesh::Face SurfaceMeshPicker::pick_face_gpu(SurfaceMesh *model, int x, int y, ShaderProgram* program) {
         auto drawable = model->renderer()->get_triangles_drawable("faces");
         if (!drawable) {
-            LOG_FIRST_N(3, WARNING) << "drawable 'faces' does not exist. " << COUNTER;
+            LOG_N_TIMES(3, WARNING) << "drawable 'faces' does not exist. " << COUNTER;
             return SurfaceMesh::Face();
         }
 

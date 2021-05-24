@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef PAINT_CANVAS_H
 #define PAINT_CANVAS_H
@@ -28,13 +28,12 @@
 #include <easy3d/core/types.h>
 
 #include <QOpenGLWidget>
-
+#include <QElapsedTimer>
 
 namespace easy3d {
     class Camera;
     class Model;
     class TrianglesDrawable;
-    class OpenGLTimer;
     class TextRenderer;
 }
 
@@ -186,8 +185,7 @@ protected:
     double  dpi_scaling_;
     int     samples_;
 
-    easy3d::OpenGLTimer* gpu_timer_;
-    double gpu_time_;
+    QElapsedTimer timer_;
     easy3d::TextRenderer* texter_;
 
     easy3d::Camera*	camera_;

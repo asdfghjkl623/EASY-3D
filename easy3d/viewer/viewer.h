@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_VIEWER_VIEWER_H
 #define EASY3D_VIEWER_VIEWER_H
@@ -45,14 +45,13 @@ namespace easy3d {
 
     /**
      * @brief The built-in Easy3D Viewer.
-     * \class Viewer easy3d/viewer/viewer.h
+     * @class Viewer easy3d/viewer/viewer.h
      * @details Easy3D is really easy to use. That's why it has such a name.
-     *
-     * To use the viewer, simply create an instance of Viewer, and call the run() method, i.e.,
-     * \code
-     * MyViewer viewer("Example");
-     * viewer.run();
-     * \endcode
+     * To use the viewer, simply create an instance of Viewer, and call the run() method, e.g.,
+     *      \code
+     *          MyViewer viewer("Example");
+     *          viewer.run();
+     *      \endcode
      * The default Easy3D viewer can be easily extended by deriving your enhanced viewer from it
      * by re-implementing some of its unctions (see the documentation of Viewer).
      */
@@ -61,7 +60,7 @@ namespace easy3d {
 	public:
         /**
          * @brief Creating the Viewer
-         * @param title The window title of the viewer.
+         * @param title The window title of the viewer, which can be changed by calling set_title() after construction.
          * @param samples The number of samples for multisample antialiasing
          * @param gl_major/gl_minor The OpenGL version to request. The created context will be
          *        compatible with the requested version (if the context creation succeeded).
@@ -71,6 +70,8 @@ namespace easy3d {
          *        framebuffer.
          * @param stencil_bits The desired bit depths of the stencil component of the default
          *        framebuffer.
+         * @param width The width of the viewer, which can be changed by calling resize() after construction.
+         * @param height The height of the viewer, which can be changed by calling resize() after construction.
          */
 		Viewer(
 			const std::string& title = "Easy3dViewer",
@@ -80,7 +81,9 @@ namespace easy3d {
             bool full_screen = false,
 			bool resizable = true,
 			int depth_bits = 24,
-			int stencil_bits = 8
+			int stencil_bits = 8,
+			int width = 960,
+			int height = 800
 		);
 
         /**
@@ -93,14 +96,15 @@ namespace easy3d {
          */
         int run();
 
-
-        /** -------------------- The viewer properties ---------------------- */
+        /// @name Viewer properties
+        //@{
 
         /**
          * @brief Set the window title of the viewer.
          * @param title The string of the title.
          */
 		void set_title(const std::string &title);
+
         /**
          * @brief Query the window title of the viewer.
          * @return The string of the window title.
@@ -113,11 +117,9 @@ namespace easy3d {
          */
         void resize(int w, int h);
 
-        /**
-         * @brief Query the size of the viewer.
-         * @return The width/height of the viewer.
-         */
+        /// @brief Returns the width of the viewer.
         int width() const;
+        /// @brief Returns the height of the viewer.
         int height() const;
 
         /**
@@ -145,13 +147,14 @@ namespace easy3d {
          */
         const easy3d::vec4& background_color() const { return background_color_; }
 
-        /**
-         * @brief Returns the camera used by the viewer. See camera.h.
-         */
+        /// @brief Returns the camera used by the viewer. See \c Camera.
         Camera* camera() { return camera_; }
+        /// @brief Returns the camera used by the viewer. See \c Camera.
         const Camera* camera() const { return camera_; }
+        //@}
 
-        /** ------------------------------------ fileIO -------------------------------------- */
+        /// @name File IO
+        //@{
 
         /**
          * @brief Open a model (PointCloud/SurfaceMesh/Graph) from a file into the viewer. On
@@ -171,8 +174,10 @@ namespace easy3d {
          * @return true on success and false otherwise.
          */
         virtual bool save() const;
+        //@}
 
-        /** ------------------------------- model management --------------------------------- */
+        /// @name Model management
+        //@{
 
         /**
          * @brief Add a model from a file to the viewer to be visualized. On success, the viewer
@@ -236,8 +241,10 @@ namespace easy3d {
          * @return The active model.
          */
         Model* current_model() const;
+        //@}
 
-        /** ------------------------------------ drawable management ---------------------------------- */
+        /// @name Drawable management
+        //@{
 
         /**
          * @brief Add a drawable to the viewer to be visualized. After a drawable being added to the
@@ -268,8 +275,17 @@ namespace easy3d {
          * @brief Delete all visual contents of the viewer (all models and drawables).
          */
         void clear_scene();
+        //@}
 
-        /** ----------------------------- UI ----------------------------------- */
+        /// @name UI-related functions
+        //@{
+
+        /**
+         * @brief Update the display (i.e., repaint).
+         * @details This method is used to update the display of the rendering. Client should call
+         *          it when your data/view is changed.
+         */
+        void update() const;
 
         /**
          * @brief Moves the camera so that the entire scene or the active model is centered on the
@@ -307,17 +323,24 @@ namespace easy3d {
 		vec3 point_under_pixel(int x, int y, bool &found) const;
 
         /**
-         * @brief Update the display (i.e., repaint).
-         * @details This method is used to update the display of the rendering. Client should call
-         *          it when your data/view is changed.
-         */
-        void update() const;
-
-        /**
          * @brief The usage information of the viewer. For the time being, it is the manual of the
          *        viewer. User can override the usage.
          */
 	    virtual std::string usage() const;
+	    //@}
+
+	    /// @name Animation
+	    //@{
+        /// @brief Function called at an equal interval for animation
+        std::function<bool(Viewer& viewer)> animation_func_;
+
+        /// @brief Enable/Disable animation.
+        /// @attention To have animation, \c animation_func_ must be provided to specify how scene geometry is modified.
+        void set_animation(bool b);
+
+        /// @brief Is animation currently being performed.
+        bool is_animating() const;
+        //@}
 
 	protected:
 
@@ -355,40 +378,43 @@ namespace easy3d {
 		// This function will be called after the window size being changed.
         virtual void post_resize(int w, int h) { (void)w, (void)h; }
 
-		/// Mouse button press event handler
+		// Mouse button press event handler
 		virtual bool mouse_press_event(int x, int y, int button, int modifiers);
-		/// Mouse button release event handler
+		// Mouse button release event handler
 		virtual bool mouse_release_event(int x, int y, int button, int modifiers);
-		/// Mouse drag (i.e., a mouse button was pressed) event handler
+		// Mouse drag (i.e., a mouse button was pressed) event handler
 		virtual bool mouse_drag_event(int x, int y, int dx, int dy, int button, int modifiers);
-		/// Mouse free move (i.e., no mouse button was pressed) event handler
+		// Mouse free move (i.e., no mouse button was pressed) event handler
 		virtual bool mouse_free_move_event(int x, int y, int dx, int dy, int modifiers);
-		/// Mouse scroll event handler
+		// Mouse scroll event handler
 		virtual bool mouse_scroll_event(int x, int y, int dx, int dy);
 
-		/// Text input event handler: codepoint is native endian UTF-32 format
-		/// NOTE: This one reveals the actual character being sent (not just the physical key)
+		// Text input event handler: codepoint is native endian UTF-32 format
+		// NOTE: This one reveals the actual character being sent (not just the physical key)
 		virtual bool char_input_event(unsigned int codepoint);
-		/// Keyboard event handler. 
-		/// NOTE: This function does not reveal the actual character.
+		// Keyboard event handler.
+		// NOTE: This function does not reveal the actual character.
 		virtual bool key_press_event(int key, int modifiers);
 		virtual bool key_release_event(int key, int modifiers);
 
-		/// Handle a file drop event
+		// Handle a file drop event
 		virtual bool drop_event(const std::vector<std::string> & filenames);
 
-		/// Handle a focus change event
+		// Handle a focus change event
 		virtual bool focus_event(bool focused);
 
 	protected:
-        GLFWwindow*	create_window(const std::string& title,
+        GLFWwindow *create_window(const std::string &title,
                                   int samples,
                                   int gl_major,   // must >= 3
                                   int gl_minor,   // must >= 2
                                   bool full_screen,
                                   bool resizable,
                                   int depth_bits = 24,
-                                  int stencil_bits = 8);
+                                  int stencil_bits = 8,
+                                  int width = 960,
+                                  int height = 800);
+
         void setup_callbacks(GLFWwindow*);
 
 		/* Event handlers. Client code should not touch these */
@@ -405,7 +431,10 @@ namespace easy3d {
         void draw_face_labels(Model* model, TextRenderer* texter, int font_id, const vec3& color) const;
         void draw_vertex_labels(Model* model, TextRenderer* texter, int font_id, const vec3& color) const;
 
-	protected:
+        void copy_view();
+        void paste_view();
+
+    protected:
 		GLFWwindow*	window_;
         float       dpi_scaling_;
 
@@ -413,6 +442,7 @@ namespace easy3d {
 		Camera*		camera_;
 
         KeyFrameInterpolator* kfi_;
+        bool is_animating_;
 
         int		samples_;	// the actual samples
 
@@ -436,6 +466,7 @@ namespace easy3d {
 		int     pressed_key_;
 
 		bool    show_pivot_point_;
+		bool    show_frame_rate_;
 
 		//----------------- viewer data -------------------
 

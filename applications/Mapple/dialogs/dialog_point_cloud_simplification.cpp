@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "dialogs/dialog_point_cloud_simplification.h"
@@ -59,7 +59,7 @@ DialogPointCloudSimplification::DialogPointCloudSimplification(MainWindow *windo
 
     connect(buttonComputeAvgSpacing, SIGNAL(clicked()), this, SLOT(computeAvgSpacing()));
     connect(applyButton, SIGNAL(clicked()), this, SLOT(apply()));
-    connect(qureyButton, SIGNAL(clicked()), this, SLOT(query()));
+    connect(queryButton, SIGNAL(clicked()), this, SLOT(query()));
 }
 
 

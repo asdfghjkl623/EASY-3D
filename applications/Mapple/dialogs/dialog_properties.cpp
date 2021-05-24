@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 #include "dialogs/dialog_properties.h"
@@ -56,6 +56,7 @@ DialogProperties::DialogProperties(MainWindow *window)
     comboBoxCommand->addItem("Remove");
     comboBoxCommand->addItem("Rename");
     comboBoxCommand->addItem("Convert Data Type");
+    comboBoxCommand->addItem("Generate Color Property");
     comboBoxCommand->setCurrentIndex(0);
 
     comboBoxSourceType->setEditable(false);
@@ -123,24 +124,32 @@ void DialogProperties::commandChanged(const QString &) {
         comboBoxSourceType->setVisible(true);
         labelPropertyTo->setVisible(true);
         comboBoxTargetType->setVisible(true);
-    } else if (command == "Split (Vector -> Scalars)") {
+    } else if (command == "Generate Color Property") {
         labelPropertyName->setText("Property");
-        labelNewPropertyName->setText("New property");
-        labelNewPropertyName->setVisible(true);
-        lineEditNewPropertyName->setVisible(true);
+        labelNewPropertyName->setVisible(false);
+        lineEditNewPropertyName->setVisible(false);
         labelDataType->setVisible(false);
         comboBoxSourceType->setVisible(false);
         labelPropertyTo->setVisible(false);
         comboBoxTargetType->setVisible(false);
+    } else if (command == "Split (Vector -> Scalars)") {
+//        labelPropertyName->setText("Property");
+//        labelNewPropertyName->setText("New property");
+//        labelNewPropertyName->setVisible(true);
+//        lineEditNewPropertyName->setVisible(true);
+//        labelDataType->setVisible(false);
+//        comboBoxSourceType->setVisible(false);
+//        labelPropertyTo->setVisible(false);
+//        comboBoxTargetType->setVisible(false);
     } else if (command == "Merge (Scalars -> Vector)") {
-        labelPropertyName->setText("Property 1");
-        labelNewPropertyName->setText("New property");
-        labelNewPropertyName->setVisible(true);
-        lineEditNewPropertyName->setVisible(true);
-        labelDataType->setVisible(false);
-        comboBoxSourceType->setVisible(false);
-        labelPropertyTo->setVisible(false);
-        comboBoxTargetType->setVisible(false);
+//        labelPropertyName->setText("Property 1");
+//        labelNewPropertyName->setText("New property");
+//        labelNewPropertyName->setVisible(true);
+//        lineEditNewPropertyName->setVisible(true);
+//        labelDataType->setVisible(false);
+//        comboBoxSourceType->setVisible(false);
+//        labelPropertyTo->setVisible(false);
+//        comboBoxTargetType->setVisible(false);
     }
     updateProperties();
 }
@@ -951,6 +960,49 @@ namespace details {
                          << "'";
         return false;
     }
+
+
+    template <typename FT>
+    bool color_by_face_segmentation(SurfaceMesh* mesh, const std::string& name) {
+        auto segments = mesh->face_property<FT>(name);
+        if (!segments) {
+            LOG(INFO) << "face property '" << name << "' does not exist";
+            return false;
+        }
+
+        std::string color_name = "f:color-";
+        if (name.find("f:") == std::string::npos)
+            color_name += name;
+        else
+            color_name += name.substr(2);
+
+        auto coloring = mesh->face_property<vec3>(color_name, vec3(0, 0, 0));
+        Renderer::color_from_segmentation(mesh, segments, coloring);
+        LOG(INFO) << "face property '" << color_name << "' added to model";
+        return true;
+    }
+
+
+    template <typename MODEL, typename FT>
+    bool color_by_vertex_segmentation(MODEL* model, const std::string& name) {
+        auto segments = model->template vertex_property<FT>(name);
+        if (!segments) {
+            LOG(INFO) << "vertex property '" << name << "' does not exist";
+            return false;
+        }
+
+        std::string color_name = "v:color-";
+        if (name.find("v:") == std::string::npos)
+            color_name += name;
+        else
+            color_name += name.substr(2);
+
+        auto coloring = model->template vertex_property<vec3>(color_name, vec3(0, 0, 0));
+        Renderer::color_from_segmentation(model, segments, coloring);
+        LOG(INFO) << "vertex property '" << color_name << "' added to model";
+        return true;
+    }
+
 }
 
 
@@ -1061,6 +1113,8 @@ void DialogProperties::applyCommand() {
         succeed = renameProperty();
     else if (command == "Convert Data Type")
         succeed = convertPropertyDataType();
+    else if (command == "Generate Color Property")
+        succeed = generateColorProperty();
 
     if (succeed) {
         updateProperties();
@@ -1263,5 +1317,93 @@ bool DialogProperties::convertPropertyDataType() {
                   << source_type << "' to '" << target_type << "'";
         return true;
     }
+    return false;
+}
+
+
+bool DialogProperties::generateColorProperty() {
+    Model *model = getModel();
+    if (!model)
+        return false;
+
+    const std::string &location = comboBoxPropertyLocation->currentText().toStdString();
+    const std::string &name = comboBoxPropertyName->currentText().toStdString();
+    if (location.empty() || name.empty())
+        return false;
+
+    if (dynamic_cast<PointCloud *>(model)) {
+        if (location != "Vertex") {
+            LOG(WARNING) << "color property can only be generated from a vertex property";
+            return false;
+        }
+
+        auto cloud = dynamic_cast<PointCloud *>(model);
+        const auto& id = cloud->get_vertex_property_type(name);
+
+        bool status = false;
+        if (id == typeid(int))
+            status = details::color_by_vertex_segmentation<PointCloud, int>(cloud, name);
+        else if (id == typeid(unsigned int))
+            status = details::color_by_vertex_segmentation<PointCloud, unsigned int>(cloud, name);
+        else if (id == typeid(std::size_t))
+            status = details::color_by_vertex_segmentation<PointCloud, std::size_t>(cloud, name);
+        else if (id == typeid(bool))
+            status = details::color_by_vertex_segmentation<PointCloud, bool>(cloud, name);
+        else if (id == typeid(unsigned char))
+            status = details::color_by_vertex_segmentation<PointCloud, unsigned char>(cloud, name);
+        else
+            LOG(WARNING) << "input property must be a type of int, unsigned int, std::size_t, bool, or unsigned char";
+
+        if (status)
+            window_->updateRenderingPanel();
+
+        return status;
+    } else if (dynamic_cast<SurfaceMesh *>(model)) {
+        auto mesh = dynamic_cast<SurfaceMesh *>(model);
+        bool status = false;
+        if (location == "Face") {
+            const auto& id = mesh->get_face_property_type(name);
+            if (id == typeid(int))
+                status = details::color_by_face_segmentation<int>(mesh, name);
+            else if (id == typeid(unsigned int))
+                status = details::color_by_face_segmentation<unsigned int>(mesh, name);
+            else if (id == typeid(std::size_t))
+                status = details::color_by_face_segmentation<std::size_t>(mesh, name);
+            else if (id == typeid(bool))
+                status = details::color_by_face_segmentation<bool>(mesh, name);
+            else if (id == typeid(unsigned char))
+                status = details::color_by_face_segmentation<unsigned char>(mesh, name);
+            else
+                LOG(WARNING) << "input property must be a type of int, unsigned int, std::size_t, bool, or unsigned char";
+
+            if (status)
+                window_->updateRenderingPanel();
+
+            return status;
+        }
+        else if (location == "Vertex") {
+            const auto& id = mesh->get_vertex_property_type(name);
+            if (id == typeid(int))
+                status = details::color_by_vertex_segmentation<SurfaceMesh, int>(mesh, name);
+            else if (id == typeid(unsigned int))
+                status = details::color_by_vertex_segmentation<SurfaceMesh, unsigned int>(mesh, name);
+            else if (id == typeid(std::size_t))
+                status = details::color_by_vertex_segmentation<SurfaceMesh, std::size_t>(mesh, name);
+            else if (id == typeid(bool))
+                status = details::color_by_vertex_segmentation<SurfaceMesh, bool>(mesh, name);
+            else if (id == typeid(unsigned char))
+                status = details::color_by_vertex_segmentation<SurfaceMesh, unsigned char>(mesh, name);
+            else
+                LOG(WARNING) << "input property must be a type of int, unsigned int, std::size_t, bool, or unsigned char";
+
+            if (status)
+                window_->updateRenderingPanel();
+
+            return status;
+        }
+        else
+            LOG(WARNING) << "color property can only be generated from either a vertex or a face property";
+    }
+
     return false;
 }

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_RENDERER_SETTING_H
 #define EASY3D_RENDERER_SETTING_H
@@ -33,7 +33,10 @@ namespace easy3d {
 
     class ClippingPlane;
 
-    // the default parameters used for initialization of both ui and rendering
+    /**
+     * \brief Default parameters used for initializing rendering and UI
+     * \namespace easy3d::setting
+     */
     namespace setting {
 
         // ui

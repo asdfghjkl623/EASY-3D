@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/dual_depth_peeling.h>
 
@@ -31,7 +31,7 @@
 #include <easy3d/renderer/opengl_error.h>
 #include <easy3d/renderer/shader_manager.h>
 #include <easy3d/renderer/shader_program.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/setting.h>
 #include <easy3d/renderer/transform.h>
@@ -432,7 +432,7 @@ namespace easy3d {
 
         program->bind();
         program->bind_texture("TempTex", fbo_->color_texture(BackTemp), 0);
-        opengl::draw_full_screen_quad(ShaderProgram::POSITION, ShaderProgram::TEXCOORD, 0.0f);
+        shapes::draw_full_screen_quad(ShaderProgram::POSITION, ShaderProgram::TEXCOORD, 0.0f);
         program->release_texture();
         program->release();
 
@@ -474,7 +474,7 @@ namespace easy3d {
         program->bind();
         program->bind_texture("FrontBlenderTex", fbo_->color_texture(front_source_), 0);
         program->bind_texture("BackBlenderTex", fbo_->color_texture(Back), 1);
-        opengl::draw_full_screen_quad(ShaderProgram::POSITION, ShaderProgram::TEXCOORD, 0.9f);
+        shapes::draw_full_screen_quad(ShaderProgram::POSITION, ShaderProgram::TEXCOORD, 0.9f);
         program->release_texture();
         program->release();
     }

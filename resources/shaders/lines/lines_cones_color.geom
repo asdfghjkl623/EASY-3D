@@ -1,5 +1,29 @@
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
+ * https://3d.bk.tudelft.nl/liangliang/
+ *
+ * This file is part of Easy3D. If it is useful in your research/work,
+ * I would be grateful if you show your appreciation by citing it:
+ * ------------------------------------------------------------------
+ *      Liangliang Nan.
+ *      Easy3D: a lightweight, easy-to-use, and efficient C++
+ *      library for processing and rendering 3D data. 2018.
+ * ------------------------------------------------------------------
+ * Easy3D is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License Version 3
+ * as published by the Free Software Foundation.
+ *
+ * Easy3D is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ ********************************************************************/
+
 #version 150
-// please send comments or report bug to: liangliang.nan@gmail.com
+
 
 // It uses geometry shader for vertex generation.
 // The code does not cover round caps.
@@ -42,7 +66,7 @@ void main()
     vec3  len_dir = top - base;
     vec3  view_dir = vec3(0, 0, 1);// this is view direction for orthographic mode in camera space
     if (perspective)
-    view_dir = normalize(vec3(0) - base);// camera pos is (0, 0, 0) in camera space
+        view_dir = normalize(vec3(0) - base);// camera pos is (0, 0, 0) in camera space
 
     vec3 left = cross(view_dir, len_dir);
     vec3 up = cross(left, len_dir);
@@ -65,7 +89,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -82,7 +106,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -99,7 +123,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -116,7 +140,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -133,7 +157,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -151,7 +175,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -172,7 +196,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -189,7 +213,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -206,7 +230,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in
@@ -223,7 +247,7 @@ void main()
         if (clippingPlaneEnabled) {
             gl_ClipDistance[0] = dot(invMV * vec4(DataOut.point, 1.0), clippingPlane0);
             if (crossSectionEnabled)
-            gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
+                gl_ClipDistance[1] = dot(invMV *vec4(DataOut.point, 1.0), clippingPlane1);
         }
         // In the geometry language, gl_PrimitiveID is an output variable that is passed to the corresponding gl_PrimitiveID input variable in
         // the fragment shader.If no geomery shader is present then gl_PrimitiveID in the fragment language behaves identically as it would in

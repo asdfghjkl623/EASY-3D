@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 #include <easy3d/core/model.h>
@@ -30,7 +30,7 @@
 #include <easy3d/renderer/opengl.h>
 #include <easy3d/renderer/shader_program.h>
 #include <easy3d/renderer/shader_manager.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/transform.h>
 #include <easy3d/renderer/renderer.h>
 
@@ -153,6 +153,6 @@ void CompositeView::update_grid() {
     int x_steps = width() * 0.5f / grid_size_;
     int y_steps = height() * 0.5f / grid_size_;
     std::vector<vec3> points;
-    opengl::prepare_grid(x_steps, y_steps, points, 0.99f, grid_size_ * dpi_scaling());
+    shapes::create_grid(x_steps, y_steps, points, 0.99f, grid_size_ * dpi_scaling());
     grid_->update_vertex_buffer(points);
 }

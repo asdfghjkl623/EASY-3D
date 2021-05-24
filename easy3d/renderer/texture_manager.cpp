@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/texture_manager.h>
 #include <easy3d/fileio/image_io.h>
@@ -49,7 +49,7 @@ namespace easy3d {
 
             Texture *texture = Texture::create(image_file, wrap, filter);
             if (!texture) {
-                LOG_FIRST_N(3, ERROR) << "failed creating texture from image file: " << image_file
+                LOG_N_TIMES(3, ERROR) << "failed creating texture from image file: " << image_file
                                       << ". " << COUNTER;
                 attempt_load_texture_[image_file] = false;
                 return nullptr;
@@ -89,7 +89,7 @@ namespace easy3d {
 
             Texture *texture = Texture::create(data, width, height, comp, wrap, filter);
             if (!texture) {
-                LOG_FIRST_N(3, ERROR) << "failed creating texture from image file: " << file_name
+                LOG_N_TIMES(3, ERROR) << "failed creating texture from image file: " << file_name
                                       << ". " << COUNTER;
                 attempt_load_texture_[file_name] = false;
                 return nullptr;

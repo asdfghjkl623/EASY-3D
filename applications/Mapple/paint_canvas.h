@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 
 
@@ -47,6 +47,7 @@ namespace easy3d {
     class TextRenderer;
     class ModelPicker;
     class SurfaceMeshPicker;
+    class PointCloudPicker;
 }
 
 class QWidget;
@@ -149,8 +150,9 @@ public slots:
     // centers the entire scene to fit the screen region.
     void fitScreen();
 
-    void showFaceVertexLabelsUnderMouse(bool);
-    void showCordinatesUnderMouse(bool);
+    void showPrimitiveIDUnderMouse(bool);
+    void showPrimitivePropertyUnderMouse(bool);
+    void showCoordinatesUnderMouse(bool);
 
     void showEasy3DLogo(bool);
     void showFrameRate(bool);
@@ -274,7 +276,8 @@ protected:
 
 protected:
     void drawCornerAxes();
-    void drawFaceAndVertexLabels(const QColor& face_color, const QColor& vertex_color);
+    void drawPickedFaceAndItsVerticesIDs(const QColor& face_color, const QColor& vertex_color);
+    void drawPickedVertexID(const QColor& vertex_color);
 
 protected:
     MainWindow* window_;
@@ -314,9 +317,11 @@ protected:
     easy3d::ModelPicker* model_picker_;
     bool    allow_select_model_;
     easy3d::SurfaceMeshPicker* surface_mesh_picker_;
-    bool    show_labels_under_mouse_;
     int     picked_face_index_;
-
+    easy3d::PointCloudPicker*  point_cloud_picker_;
+    int     picked_vertex_index_;
+    bool    show_primitive_id_under_mouse_;
+    bool    show_primitive_property_under_mouse_;
     bool    show_coordinates_under_mouse_;
 
     std::vector<easy3d::Model*> models_;

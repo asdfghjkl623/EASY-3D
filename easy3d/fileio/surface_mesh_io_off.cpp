@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/fileio/surface_mesh_io.h>
 #include <easy3d/core/types.h>
@@ -111,7 +111,7 @@ namespace easy3d {
 #endif
                 }
                 else {
-                    LOG_FIRST_N(3, ERROR) << "failed reading the " << i << "_th vertex from file. " << COUNTER;
+                    LOG_N_TIMES(3, ERROR) << "failed reading the " << i << "_th vertex from file. " << COUNTER;
                 }
             }
 
@@ -129,7 +129,7 @@ namespace easy3d {
                             vertices.emplace_back(SurfaceMesh::Vertex(index));
                         }
                         else {
-                            LOG_FIRST_N(3, ERROR) << "failed reading the " << j << "_th vertex of the " << i << "_th face from file. " << COUNTER;
+                            LOG_N_TIMES(3, ERROR) << "failed reading the " << j << "_th vertex of the " << i << "_th face from file. " << COUNTER;
                         }
 					}
 #if RESOLVE_NONMANIFOLDNESS
@@ -139,7 +139,7 @@ namespace easy3d {
 #endif
 				}
                 else {
-                    LOG_FIRST_N(3, ERROR) << "failed reading the " << i << "_th face from file. " << COUNTER;
+                    LOG_N_TIMES(3, ERROR) << "failed reading the " << i << "_th face from file. " << COUNTER;
                 }
             }
 

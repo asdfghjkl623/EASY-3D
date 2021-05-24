@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_CORE_SPLINE_INTERPOLATION_H
 #define EASY3D_CORE_SPLINE_INTERPOLATION_H
@@ -196,7 +196,7 @@ namespace easy3d {
         // TODO: maybe sort x and y, rather than returning an error
         for (int i = 0; i < n - 1; i++) {
             if (x_[i] >= x_[i + 1]) {
-                LOG_FIRST_N(3, ERROR) << "x has to be monotonously increasing. " << COUNTER;;
+                LOG_N_TIMES(3, ERROR) << "x has to be monotonously increasing (x[" << i << "]=" << x_[i] << ", x[" << i + 1 << "]=" << x_[i + 1] << "). " << COUNTER;;
                 return;
             }
         }

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/shader_manager.h>
 #include <easy3d/renderer/opengl_error.h>
@@ -59,19 +59,19 @@ namespace easy3d {
         const std::string dir = resource::directory() + "/shaders/";
         const std::string vs_file = dir + base_name + ".vert";
         if (!file_system::is_file(vs_file)) {
-            LOG_FIRST_N(3, ERROR) << "vertex shader file \'" << vs_file + " does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "vertex shader file \'" << vs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
         const std::string fs_file = dir + base_name + ".frag";
         if (!file_system::is_file(fs_file)) {
-            LOG_FIRST_N(3, ERROR) << "fragment shader file \'" << fs_file + " does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "fragment shader file \'" << fs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
         const std::string gs_file = dir + base_name + ".geom";
         if (geom_shader && !file_system::is_file(gs_file)) {
-            LOG_FIRST_N(3, ERROR) << "geometry shader file \'" << gs_file + " does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "geometry shader file \'" << gs_file + " does not exist. " << COUNTER;
             attempt_load_program_[base_name] = false;
             return nullptr;
         }
@@ -139,19 +139,19 @@ namespace easy3d {
         const std::string dir = resource::directory() + "/shaders/";
 		const std::string vert_file = dir + vert_file_name;
         if (!file_system::is_file(vert_file)) {
-            LOG_FIRST_N(3, ERROR) << "vertex shader file \'" << vert_file_name + "\' does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "vertex shader file \'" << vert_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
 		const std::string frag_file = dir + frag_file_name;
         if (!file_system::is_file(frag_file)) {
-            LOG_FIRST_N(3, ERROR) << "fragment shader file \'" << frag_file_name + "\' does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "fragment shader file \'" << frag_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
 		const std::string geom_file = dir + geom_file_name;
         if (!geom_file_name.empty() && !file_system::is_file(geom_file)) {
-            LOG_FIRST_N(3, ERROR) << "geometry shader file \'" << geom_file_name + "\' does not exist. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "geometry shader file \'" << geom_file_name + "\' does not exist. " << COUNTER;
 			attempt_load_program_[name] = false;
 			return nullptr;
 		}
@@ -220,6 +220,9 @@ namespace easy3d {
 			delete p.second;
         programs_.clear();
         attempt_load_program_.clear();
+
+        // 'spBlocks' is a static member and the uniform blocks are shared by multiple shader programs
+        ShaderProgram::spBlocks.clear();
     }
 
 

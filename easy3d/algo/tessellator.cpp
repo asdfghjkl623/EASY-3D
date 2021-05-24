@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/algo/tessellator.h>
 
@@ -30,7 +30,7 @@
 #include <easy3d/core/hash.h>
 #include <easy3d/util/logging.h>
 
-#include <3rd_party/libtess/glutess.h>
+#include <3rd_party/glutess/glutess.h>
 
 
 namespace easy3d {
@@ -61,7 +61,7 @@ namespace easy3d {
                 } else {
 #ifndef NDEBUG
                     if (distance2(vec3(unique_vertices_[pos->second]->data()), vec3(v.data())) > 1e-6) {
-                        LOG_FIRST_N(3, ERROR) << "bad: two distinct points have the same hash key\n"
+                        LOG_N_TIMES(3, ERROR) << "bad: two distinct points have the same hash key\n"
                                               << "\t\tpoint: " << vec3(unique_vertices_[pos->second]->data()) << " <-> "
                                               << vec3(v.data()) << "\n" << "\t\thash key: " << key << ". " << COUNTER;
                     }
@@ -320,7 +320,7 @@ namespace easy3d {
             }
 
             default: {
-                LOG_FIRST_N(3, WARNING) << "unknown primitive type: " << tessellator->primitive_type_ << ". " << COUNTER;
+                LOG_N_TIMES(3, WARNING) << "unknown primitive type: " << tessellator->primitive_type_ << ". " << COUNTER;
                 break;
             }
         }

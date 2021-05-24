@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/viewer/viewer.h>
 #include <easy3d/core/surface_mesh.h>
@@ -47,7 +47,6 @@ void create_spheres(SurfaceMesh *mesh) {
     drawable->set_uniform_coloring(vec4(1.0f, 0.0f, 0.0f, 1.0f));
     drawable->set_point_size(24.0f);
     drawable->set_impostor_type(PointsDrawable::SPHERE);
-
 }
 
 

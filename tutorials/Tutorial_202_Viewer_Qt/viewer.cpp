@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 
@@ -32,7 +32,7 @@
 #include <easy3d/renderer/drawable_triangles.h>
 #include <easy3d/renderer/shader_program.h>
 #include <easy3d/renderer/shader_manager.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/transform.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/manipulated_camera_frame.h>
@@ -66,7 +66,7 @@ using namespace easy3d;
 
 
 ViewerQt::ViewerQt(QWidget *parent /* = nullptr*/)
-        : QOpenGLWidget(parent), func_(nullptr), gpu_timer_(nullptr), texter_(nullptr), pressed_button_(Qt::NoButton),
+        : QOpenGLWidget(parent), func_(nullptr), texter_(nullptr), pressed_button_(Qt::NoButton),
           mouse_pressed_pos_(0, 0), mouse_previous_pos_(0, 0), show_pivot_point_(false), drawable_axes_(nullptr),
           model_idx_(-1) {
     // like Qt::StrongFocus plus the widget accepts focus by using the mouse wheel.
@@ -97,7 +97,6 @@ ViewerQt::~ViewerQt() {
 void ViewerQt::cleanup() {
     delete camera_;
     delete drawable_axes_;
-    delete gpu_timer_;
     delete texter_;
 
     for (auto m : models_) {
@@ -167,6 +166,7 @@ void ViewerQt::initializeGL() {
 #else
     dpi_scaling_ = devicePixelRatio();
 #endif
+    VLOG(1) << "DPI scaling: " << dpi_scaling();
 
     // This won't work because QOpenGLWidget draws everything in framebuffer and
     // the framebuffer has not been created in the initializeGL() method. We
@@ -179,14 +179,13 @@ void ViewerQt::initializeGL() {
     texter_->add_font(resource::directory() + "/fonts/en_Earth-Normal.ttf");
     texter_->add_font(resource::directory() + "/fonts/en_Roboto-Medium.ttf");
 
-    // create a GPU timer
-    gpu_timer_ = new OpenGLTimer(false);
-
     // Calls user defined method.
     init();
 
     // print usage
     std::cout << usage() << std::endl;
+
+    timer_.start();
 }
 
 
@@ -266,13 +265,13 @@ void ViewerQt::mouseReleaseEvent(QMouseEvent *e) {
 
 void ViewerQt::mouseMoveEvent(QMouseEvent *e) {
     int x = e->pos().x(), y = e->pos().y();
+    // Restrict the cursor to be within the client area during dragging
     if (x < 0 || x > width() || y < 0 || y > height()) {
         e->ignore();
         return;
     }
 
     if (pressed_button_ != Qt::NoButton) { // button pressed
-        // Restrict the cursor to be within the client area during dragging
         if (e->modifiers() == Qt::ControlModifier) {
             // zoom on region
         } else {
@@ -293,7 +292,6 @@ void ViewerQt::mouseMoveEvent(QMouseEvent *e) {
 
     mouse_previous_pos_ = e->pos();
     QOpenGLWidget::mouseMoveEvent(e);
-    update();
 }
 
 
@@ -820,10 +818,7 @@ void ViewerQt::paintGL() {
 
     preDraw();
 
-    gpu_timer_->start();
     draw();
-    gpu_timer_->stop();
-    gpu_time_ = gpu_timer_->time();
 
     // Add visual hints: axis, camera, grid...
     postDraw();
@@ -847,16 +842,16 @@ void ViewerQt::drawCornerAxes() {
         const float base = 0.5f;   // the cylinder length, relative to the allowed region
         const float head = 0.2f;   // the cone length, relative to the allowed region
         std::vector<vec3> points, normals, colors;
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
-        opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
-        opengl::prepare_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
+        shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
+        shapes::create_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
                              colors);
-        opengl::prepare_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
+        shapes::create_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
                              colors);
-        opengl::prepare_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
+        shapes::create_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
                              colors);
-        opengl::prepare_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
+        shapes::create_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
         drawable_axes_ = new TrianglesDrawable("corner_axes");
         drawable_axes_->update_vertex_buffer(points);
         drawable_axes_->update_normal_buffer(normals);
@@ -891,13 +886,24 @@ void ViewerQt::drawCornerAxes() {
     const vec4 &wLightPos = inverse(MV) * setting::light_position;
 
     program->bind();
-    program->set_uniform("MVP", MVP);
-    program->set_uniform("wLightPos", wLightPos);
-    program->set_uniform("wCamPos", wCamPos);
-    program->set_uniform("ssaoEnabled", false);
-    program->set_uniform("per_vertex_color", true);
-    program->set_uniform("two_sides_lighting", false);
-    program->set_uniform("distinct_back_color", false);
+    program->set_uniform("MVP", MVP)
+            ->set_uniform("MANIP", mat4::identity())
+            ->set_uniform("NORMAL", mat3::identity())   // needs be padded when using uniform blocks
+            ->set_uniform("lighting", true)
+            ->set_uniform("two_sides_lighting", false)
+            ->set_uniform("smooth_shading", true)
+            ->set_uniform("wLightPos", wLightPos)
+            ->set_uniform("wCamPos", wCamPos)
+            ->set_uniform("ssaoEnabled", false)
+            ->set_uniform("per_vertex_color", true)
+            ->set_uniform("distinct_back_color", false)
+            ->set_block_uniform("Material", "ambient", setting::material_ambient)
+            ->set_block_uniform("Material", "specular", setting::material_specular)
+            ->set_block_uniform("Material", "shininess", &setting::material_shininess)
+            ->set_uniform("highlight", false)
+            ->set_uniform("clippingPlaneEnabled", false)
+            ->set_uniform("selected", false)
+            ->set_uniform("use_texture", false);
     drawable_axes_->gl_draw();
     program->release();
 
@@ -924,10 +930,17 @@ void ViewerQt::postDraw() {
         const float offset = 20.0f * dpi_scaling();
         texter_->draw("Easy3D", offset, offset, font_size, 0);
 
-        // the rendering time
-        char buffer[48];
-        sprintf(buffer, "Rendering (ms/frame): %4.1f", gpu_time_);
-        texter_->draw(buffer, offset, 50.0f * dpi_scaling(), 16, 1);
+        // FPS computation
+        static unsigned int fps_count = 0;
+        static double fps = 0.0;
+        static const unsigned int max_count = 40;
+        static QString fps_string("fps: ??");
+        if (++fps_count == max_count) {
+            fps = 1000.0 * max_count / timer_.restart();
+            fps_string = tr("fps: %1").arg(fps, 0, 'f', ((fps < 10.0) ? 1 : 0));
+            fps_count = 0;
+        }
+        texter_->draw(fps_string.toStdString(), offset, 50.0f * dpi_scaling(), 16, 1);
     }
 
     if (show_pivot_point_) {

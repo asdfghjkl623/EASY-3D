@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/util/logging.h>
 #include <easy3d/util/file_system.h>
@@ -39,6 +39,7 @@ namespace easy3d
 
         // \cond
         std::string log_file_name = "";
+        bool logging_initialized = false;
 
 
         std::string stacktrace_failure_header() {
@@ -65,7 +66,7 @@ namespace easy3d
 
         std::string crash_reason(int sig) {
             std::stringstream ss;
-            bool foundReason = false;
+            bool found_reason = false;
             for (int i = 0; i < el::base::consts::kCrashSignalsCount; ++i) {
                 if (el::base::consts::kCrashSignals[i].numb == sig) {
                     ss << "Application has crashed due to [" << el::base::consts::kCrashSignals[i].name << "] signal";
@@ -74,10 +75,10 @@ namespace easy3d
                            "    " << el::base::consts::kCrashSignals[i].brief << std::endl <<
                            "    " << el::base::consts::kCrashSignals[i].detail;
                     }
-                    foundReason = true;
+                    found_reason = true;
                 }
             }
-            if (!foundReason) {
+            if (!found_reason) {
                 ss << "Application has crashed due to unknown signal [" << sig << "]";
             }
             return ss.str();
@@ -101,6 +102,11 @@ namespace easy3d
 
         void initialize(bool info_to_stderr, const std::string &log_file, int verbosity_threshold)
         {
+            if (logging_initialized) {
+                LOG(WARNING) << "logging has already been initialized";
+                return;
+            }
+
             std::string full_path_log_file = log_file;
             if (log_file == "default") {
                 const std::string app_path = file_system::executable();
@@ -178,6 +184,13 @@ namespace easy3d
 
             if (!log_file_failure_msg.empty())
                 VLOG(1) << log_file_failure_msg;
+
+            logging_initialized = true;
+        }
+
+
+        bool is_initialized() {
+            return logging_initialized;
         }
 
 

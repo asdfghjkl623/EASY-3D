@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/algo/point_cloud_ransac.h>
 
@@ -29,17 +29,17 @@
 
 #include <easy3d/core/point_cloud.h>
 
-#include <3rd_party/RANSAC-1.1/RansacShapeDetector.h>
-#include <3rd_party/RANSAC-1.1/PlanePrimitiveShapeConstructor.h>
-#include <3rd_party/RANSAC-1.1/CylinderPrimitiveShapeConstructor.h>
-#include <3rd_party/RANSAC-1.1/SpherePrimitiveShapeConstructor.h>
-#include <3rd_party/RANSAC-1.1/ConePrimitiveShapeConstructor.h>
-#include <3rd_party/RANSAC-1.1/TorusPrimitiveShapeConstructor.h>
-#include <3rd_party/RANSAC-1.1/PlanePrimitiveShape.h>
-#include <3rd_party/RANSAC-1.1/SpherePrimitiveShape.h>
-#include <3rd_party/RANSAC-1.1/CylinderPrimitiveShape.h>
-#include <3rd_party/RANSAC-1.1/ConePrimitiveShape.h>
-#include <3rd_party/RANSAC-1.1/TorusPrimitiveShape.h>
+#include <3rd_party/ransac/RansacShapeDetector.h>
+#include <3rd_party/ransac/PlanePrimitiveShapeConstructor.h>
+#include <3rd_party/ransac/CylinderPrimitiveShapeConstructor.h>
+#include <3rd_party/ransac/SpherePrimitiveShapeConstructor.h>
+#include <3rd_party/ransac/ConePrimitiveShapeConstructor.h>
+#include <3rd_party/ransac/TorusPrimitiveShapeConstructor.h>
+#include <3rd_party/ransac/PlanePrimitiveShape.h>
+#include <3rd_party/ransac/SpherePrimitiveShape.h>
+#include <3rd_party/ransac/CylinderPrimitiveShape.h>
+#include <3rd_party/ransac/ConePrimitiveShape.h>
+#include <3rd_party/ransac/TorusPrimitiveShape.h>
 
 //OMG, there is class with exactly the same name in RANSAC!!!
 typedef ::PointCloud PointCloud_Ransac;

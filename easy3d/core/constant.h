@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_CORE_CONSTANT_H
 #define EASY3D_CORE_CONSTANT_H
@@ -75,6 +75,15 @@ namespace easy3d {
     template <> inline double epsilon<double>() { return 1.0e-12; }
     /// \brief Function returning \c squared epsilon for double type numbers.
     template <> inline double epsilon_sqr<double>() { return 1.0e-24; }
+
+
+    /// \brief Tests if two values are Epsilon equal
+    template<typename FT>
+    bool epsilon_equal(FT const& x, FT const& y, FT const& eps) { return std::abs(x - y) < eps; }
+
+    /// \brief Tests if two values are not Epsilon equal
+    template<typename FT>
+    bool epsilon_not_equal(FT const& x, FT const& y, FT const& eps) { return std::abs(x - y) >= eps; }
 }
 
 

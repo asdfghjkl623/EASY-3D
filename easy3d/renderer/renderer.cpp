@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,10 +20,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/renderer.h>
-#include <easy3d/core/random.h>
 #include <easy3d/core/graph.h>
 #include <easy3d/core/point_cloud.h>
 #include <easy3d/core/surface_mesh.h>
@@ -251,77 +250,6 @@ namespace easy3d {
         }
 
         drawable->set_uniform_coloring(setting::surface_mesh_faces_color);
-    }
-
-
-    void Renderer::color_from_segmentation(SurfaceMesh *model, SurfaceMesh::FaceProperty<int> segments,
-                                           SurfaceMesh::FaceProperty<vec3> colors) {
-        if (model->empty()) {
-            LOG(WARNING) << "model has no valid geometry";
-            return;
-        }
-
-        if (!segments) {
-            LOG(WARNING) << "the surface mesh does not have face property \'" << segments.name() << "\'";
-            return;
-        }
-        if (!colors) {
-            LOG(WARNING) << "color property no allocated" << "\'";
-            return;
-        }
-
-        int max_index = 0;
-        for (auto f : model->faces())
-            max_index = std::max(max_index, segments[f]);
-
-        // assign each segment a unique color
-        std::vector<vec3> color_table(max_index + 1);   // index starts from 0
-        for (auto &c : color_table)
-            c = random_color();
-
-        for (auto f : model->faces()) {
-            int idx = segments[f];
-            if (idx == -1)
-                colors[f] = vec3(0, 0, 0);
-            else
-                colors[f] = color_table[idx];
-        }
-    }
-
-
-    void Renderer::color_from_segmentation(PointCloud *model,
-                                           const PointCloud::VertexProperty<int> segments,
-                                           PointCloud::VertexProperty<vec3> colors) {
-        if (model->empty()) {
-            LOG(WARNING) << "model has no valid geometry";
-            return;
-        }
-
-        if (!segments) {
-            LOG(WARNING) << "the point cloud does not have vertex property \'" << segments.name() << "\'";
-            return;
-        }
-        if (!colors) {
-            LOG(WARNING) << "color property not allocated" << "\'";
-            return;
-        }
-
-        int max_index = 0;
-        for (auto v : model->vertices())
-            max_index = std::max(max_index, segments[v]);
-
-        // assign each segment a unique color
-        std::vector<vec3> color_table(max_index + 1);   // index starts from 0
-        for (auto &c : color_table)
-            c = random_color();
-
-        for (auto v : model->vertices()) {
-            int idx = segments[v];
-            if (idx == -1)
-                colors[v] = vec3(0, 0, 0);
-            else
-                colors[v] = color_table[idx];
-        }
     }
 
 

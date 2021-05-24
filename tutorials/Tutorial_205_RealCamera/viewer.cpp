@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include "viewer.h"
 
@@ -30,7 +30,7 @@
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/manipulated_camera_frame.h>
 #include <easy3d/renderer/texture_manager.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/renderer.h>
 #include <easy3d/util/string.h>
 #include <easy3d/util/file_system.h>
@@ -48,6 +48,7 @@ RealCamera::RealCamera(const std::string& title,
     : Viewer(title, 4, 3, 2, false, false)
     , current_view_(0)
     , texture_(nullptr)
+    , cameras_drwable_(nullptr)
 {
     // Read the point cloud
     if (add_model(cloud_file)) {
@@ -56,7 +57,7 @@ RealCamera::RealCamera(const std::string& title,
 
         // Read the camera parameters from the bundler file.
         if (read_bundler_file(bundler_file))
-            create_cameras_drawable();
+            update_cameras_drawable(true);
         else
             std::cerr << "Error: failed load bundler file." << std::endl;
 
@@ -81,10 +82,12 @@ bool RealCamera::key_press_event(int key, int modifiers) {
     if (key == GLFW_KEY_SPACE) {
         if (!views_.empty()) {
             current_view_ = (current_view_ + 1) % views_.size();
-            if (KRT_to_camera(current_view_, 2, camera())) {
-                std::cout << "----- view " << current_view_ << " ------" << std::endl;
+            const bool ground_truth = true;
+            if (KRT_to_camera(current_view_, camera(), ground_truth)) {
+                update_cameras_drawable(ground_truth);
+                std::cout << "----- view " << current_view_ << ": " << (ground_truth ? "ground truth view" : "calibration view") << std::endl;
                 set_title("RealCamera: View_" + std::to_string(current_view_));
-                const CameraPara& c = views_[current_view_];
+                const CameraPara &c = views_[current_view_];
                 // make sure the aspect ratio (actual size does not matter)
                 resize(c.w * 0.3, c.h * 0.3);
             }
@@ -93,32 +96,35 @@ bool RealCamera::key_press_event(int key, int modifiers) {
     }
     else if (key == GLFW_KEY_1) {
         if (!views_.empty()) {
-            if (KRT_to_camera(current_view_, 1, camera())) {
-                std::cout << "----- view " << current_view_ << " ------" << std::endl;
-                const CameraPara& c = views_[current_view_];
+            const bool ground_truth = false;
+            if (KRT_to_camera(current_view_, camera(), ground_truth)) {
+                update_cameras_drawable(ground_truth);
+                std::cout << "----- view " << current_view_ << ": " << (ground_truth ? "ground truth view" : "calibration view") << std::endl;
+                set_title("RealCamera: View_" + std::to_string(current_view_));
+                const CameraPara &c = views_[current_view_];
                 // make sure the aspect ratio (actual size does not matter)
                 resize(c.w * 0.3, c.h * 0.3);
-                update();
             }
         }
         return true;
     }
     else if (key == GLFW_KEY_2) {
         if (!views_.empty()) {
-            if (KRT_to_camera(current_view_, 2, camera())) {
-                std::cout << "----- view " << current_view_ << " ------" << std::endl;
-                const CameraPara& c = views_[current_view_];
+            const bool ground_truth = true;
+            if (KRT_to_camera(current_view_, camera(), ground_truth)) {
+                update_cameras_drawable(ground_truth);
+                std::cout << "----- view " << current_view_ << ": " << (ground_truth ? "ground truth view" : "calibration view") << std::endl;
+                set_title("RealCamera: View_" + std::to_string(current_view_));
+                const CameraPara &c = views_[current_view_];
                 // make sure the aspect ratio (actual size does not matter)
                 resize(c.w * 0.3, c.h * 0.3);
-                update();
             }
         }
         return true;
     }
     else if (key == GLFW_KEY_H) {
-        auto d = current_model()->renderer()->get_lines_drawable("cameras");
-        if (d) {
-            d->set_visible(!d->is_visible());
+        if (cameras_drwable_) {
+            cameras_drwable_->set_visible(!cameras_drwable_->is_visible());
             update();
         }
         return true;
@@ -137,42 +143,27 @@ void RealCamera::load_image() {
 }
 
 
-bool RealCamera::KRT_to_camera(int view_index, int method, Camera* c) {
+bool RealCamera::KRT_to_camera(int view_index, Camera* c, bool ground_truth) {
     if (view_index < 0 || view_index >= views_.size()) {
         std::cerr << "Error: invalid view index (" << view_index << ")" << std::endl;
         return false;
     }
-    
+
     const CameraPara& cam = views_[view_index];
-    float fx = cam.fx;
-    float fy = cam.fy;
-    float cx = cam.cx;
-    float cy = cam.cy;
-    
-    if (method == 1) {
-        const mat3 K(
-                fx, 0.0, cx,
-                0,  fy,   cy,
-                0,  0,    1);
-        const mat4 R = mat4::rotation(cam.rx, cam.ry, cam.rz);
-        const mat4 T = mat4::translation(cam.tx, cam.ty, cam.tz);
-        mat34 M(1.0);
-        M(1, 1) = -1;// invert the y axis
-        M(2, 2) = -1;// invert the z axis
-        const mat34& proj = K * M * T * R;
-        c->set_from_projection_matrix(proj);
-    }
-    else if (method == 2) {
-        const vec3 rot_vec(-cam.rx, -cam.ry, -cam.rz);
-        const float angle = rot_vec.length();
-        const quat q(rot_vec / angle, angle);
+
+    if (ground_truth) {
+        const quat q(inverse(cam.R));  // the inverse rotation represented by a quaternion
         c->setOrientation(q);
-
-        const vec3 pos(cam.tx, cam.ty, cam.tz);
-        c->setPosition(-q.rotate(pos));
-
-        const float proj_5th = 2.0f * fy / cam.h;
-        c->setFieldOfView(2.0f * atan(1.0f / proj_5th));
+        c->setPosition(-q.rotate(cam.t));    // camera position: -inverse(rot) * t
+        const float proj11 = 2.0f * cam.fy / cam.h; // proj[1][1]
+        const float fov = 2.0f * std::atan(1.0f / proj11);
+        c->setFieldOfView(fov);
+    }
+    else {
+        c->set_from_calibration(
+                cam.fx, cam.fy, 0.0f,
+                cam.cx, cam.cy,
+                cam.R, cam.t, true);
     }
 
     load_image();
@@ -181,34 +172,32 @@ bool RealCamera::KRT_to_camera(int view_index, int method, Camera* c) {
 }
 
 
-void RealCamera::create_cameras_drawable()
-{    
+void RealCamera::update_cameras_drawable(bool ground_truth)
+{
+    if (!cameras_drwable_) {
+        cameras_drwable_ = new LinesDrawable("cameras");
+        add_drawable(cameras_drwable_); // add the camera drawables to the viewer
+        cameras_drwable_->set_uniform_coloring(vec4(0, 0, 1, 1.0f));
+        cameras_drwable_->set_line_width(2.0f);
+    }
+
     std::vector<vec3> vertices;
     for (std::size_t i = 0; i < views_.size(); ++i) {
         Camera c;
-        KRT_to_camera(i, 1, &c);
+        KRT_to_camera(i, &c, ground_truth);
         std::vector<vec3> points;
-        opengl::prepare_camera(points, camera()->sceneRadius() * 0.03f, static_cast<float>(views_[i].h)/views_[i].w);
+        shapes::create_camera(points, c.sceneRadius() * 0.03f, c.fieldOfView(), static_cast<float>(views_[i].h)/views_[i].w);
         const mat4& m = c.frame()->worldMatrix();
-        for (auto& p : points) {
+        for (auto& p : points)
             vertices.push_back(m * p);
-        }
     }
-    LinesDrawable* cameras = new LinesDrawable("cameras");
-    cameras->update_vertex_buffer(vertices);
-    cameras->set_uniform_coloring(vec4(0, 0, 1, 1.0f));
-    cameras->set_line_width(2.0f);
-    add_drawable(cameras); // add the camera drawables to the viewer
+    cameras_drwable_->update_vertex_buffer(vertices);
 }
 
 
-void RealCamera::draw() const {
-    Viewer::draw();
-    draw_image();
-}
+void RealCamera::post_draw() {
+    Viewer::post_draw();
 
-
-void RealCamera::draw_image() const {
     if (texture_ == nullptr)
         return;
 
@@ -229,6 +218,6 @@ void RealCamera::draw_image() const {
     }
 
     const Rect quad(20 * dpi_scaling(), (20 + tex_w) * dpi_scaling(), 40 * dpi_scaling(), (40 + tex_h) * dpi_scaling());
-    opengl::draw_quad_filled(quad, texture_->id(), w, h, -0.9f);
-    opengl::draw_quad_wire(quad, vec4(1.0f, 0.0f, 0.0f, 1.0f), w, h, -0.99f);
+    shapes::draw_quad_filled(quad, texture_->id(), w, h, -0.9f);
+    shapes::draw_quad_wire(quad, vec4(1.0f, 0.0f, 0.0f, 1.0f), w, h, -0.99f);
 }

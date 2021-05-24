@@ -1,3 +1,28 @@
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
+ * https://3d.bk.tudelft.nl/liangliang/
+ *
+ * This file is part of Easy3D. If it is useful in your research/work,
+ * I would be grateful if you show your appreciation by citing it:
+ * ------------------------------------------------------------------
+ *      Liangliang Nan.
+ *      Easy3D: a lightweight, easy-to-use, and efficient C++
+ *      library for processing and rendering 3D data. 2018.
+ * ------------------------------------------------------------------
+ * Easy3D is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License Version 3
+ * as published by the Free Software Foundation.
+ *
+ * Easy3D is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ ********************************************************************/
+
+
 #include "widget_drawable_triangles.h"
 
 #include <QColorDialog>
@@ -582,21 +607,6 @@ namespace triangles_details {
         }
     }
 
-}
-
-
-void WidgetTrianglesDrawable::updateVectorFieldBuffer(Model *model, const std::string &name) {
-    if (dynamic_cast<SurfaceMesh *>(model)) {
-        auto mesh = dynamic_cast<SurfaceMesh *>(model);
-        triangles_details::updateVectorFieldBuffer(mesh, name, ui->doubleSpinBoxVectorFieldScale);
-    } else if (dynamic_cast<PolyMesh *>(model)) {
-        auto mesh = dynamic_cast<PolyMesh *>(model);
-        triangles_details::updateVectorFieldBuffer(mesh, name, ui->doubleSpinBoxVectorFieldScale);
-    }
-}
-
-
-namespace triangles_details {
 
     void set_highlight_range(SurfaceMesh* m, Drawable* d, const std::pair<int, int>& range) {
         if (range.second < 0 || range.second < range.first) {
@@ -626,8 +636,20 @@ namespace triangles_details {
             else
                 LOG(INFO) << "highlighting faces [" << f_min << ", " << f_max << "]";
         } else {
-            LOG_FIRST_N(3, ERROR) << "face property \'f:triangle_range\' not defined. " << COUNTER;
+            LOG_N_TIMES(3, ERROR) << "face property \'f:triangle_range\' not defined. " << COUNTER;
         }
+    }
+
+}
+
+
+void WidgetTrianglesDrawable::updateVectorFieldBuffer(Model *model, const std::string &name) {
+    if (dynamic_cast<SurfaceMesh *>(model)) {
+        auto mesh = dynamic_cast<SurfaceMesh *>(model);
+        triangles_details::updateVectorFieldBuffer(mesh, name, ui->doubleSpinBoxVectorFieldScale);
+    } else if (dynamic_cast<PolyMesh *>(model)) {
+        auto mesh = dynamic_cast<PolyMesh *>(model);
+        triangles_details::updateVectorFieldBuffer(mesh, name, ui->doubleSpinBoxVectorFieldScale);
     }
 }
 

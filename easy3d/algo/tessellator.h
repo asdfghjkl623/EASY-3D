@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_ALGO_TESSELLATOR_H
 #define EASY3D_ALGO_TESSELLATOR_H
@@ -184,13 +184,19 @@ namespace easy3d {
          *            the original vertex. Any new vertex generated in the tessellation will have a negative index -1.
          */
         void add_vertex(const Vertex &data);
-
+        /** @overload **/
         void add_vertex(const float *data, unsigned int size, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, const vec2 &t, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, const vec3 &v1, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, const vec3 &v1, const vec2 &t, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, const vec3 &v1, const vec3 &v2, int idx = 0);
+        /** @overload **/
         void add_vertex(const vec3 &xyz, const vec3 &v1, const vec3 &v2, const vec2 &t, int idx = 0);
 
         /**

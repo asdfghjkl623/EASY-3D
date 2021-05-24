@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/fileio/poly_mesh_io.h>
 
@@ -82,8 +82,13 @@ namespace easy3d {
                 return false;
             }
             int version = -1;
-            if (2 != sscanf(line, "%s %d", str, &version))
-                fscanf(mesh_file, " %d", &version);
+            if (2 != sscanf(line, "%s %d", str, &version)) {
+                if (1 != fscanf(mesh_file, " %d", &version)) {
+                    LOG(ERROR) << "wrong file format or file crupted: could not parse version";
+                    fclose(mesh_file);
+                    return false;
+                }
+            }
             if (version != 1 && version != 2) {
                 LOG(ERROR) << "second word should be 1 or 2 instead of " << version;
                 fclose(mesh_file);
@@ -101,7 +106,11 @@ namespace easy3d {
                     int three = -1;
                     if (2 != sscanf(line, "%s %d", str, &three)) {
                         // 1 appears on next line?
-                        fscanf(mesh_file, " %d", &three);
+                        if (1 != fscanf(mesh_file, " %d", &three)) {
+                            LOG(ERROR) << "wrong file format or file crupted: Dimension must be 3";
+                            fclose(mesh_file);
+                            return false;
+                        }
                     }
                     if (three != 3) {
                         LOG(ERROR) << "only Dimension 3 supported instead of " << three;

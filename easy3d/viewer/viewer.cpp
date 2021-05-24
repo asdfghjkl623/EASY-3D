@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/viewer/viewer.h>
 
@@ -49,7 +49,7 @@
 #include <easy3d/renderer/shader_program.h>
 #include <easy3d/renderer/shader_manager.h>
 #include <easy3d/renderer/transform.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/camera.h>
 #include <easy3d/renderer/manipulated_camera_frame.h>
 #include <easy3d/renderer/key_frame_interpolator.h>
@@ -69,6 +69,7 @@
 #include <easy3d/util/file_system.h>
 #include <easy3d/util/logging.h>
 #include <easy3d/util/timer.h>
+#include <easy3d/util/string.h>
 
 
 // To have the same shortcut behavior on macOS and other platforms (i.e., Windows, Linux)
@@ -90,13 +91,23 @@ namespace easy3d {
             bool full_screen /* = false */,
             bool resizable /* = true */,
             int depth_bits /* = 24 */,
-            int stencil_bits /* = 8 */
+            int stencil_bits /* = 8 */,
+            int width /* = 960 */,
+            int height /* = 800 */
     )
-            : window_(nullptr), dpi_scaling_(1.0), title_(title), camera_(nullptr), samples_(0),
+            : window_(nullptr), dpi_scaling_(1.0), title_(title), camera_(nullptr), is_animating_(false), samples_(0),
               full_screen_(full_screen), background_color_(0.9f, 0.9f, 1.0f, 1.0f),
               process_events_(true), texter_(nullptr), pressed_button_(-1), modifiers_(-1), drag_active_(false),
               mouse_current_x_(0), mouse_current_y_(0), mouse_pressed_x_(0), mouse_pressed_y_(0), pressed_key_(-1),
-              show_pivot_point_(false), drawable_axes_(nullptr), show_camera_path_(false), model_idx_(-1) {
+              show_pivot_point_(false), show_frame_rate_(false), drawable_axes_(nullptr), show_camera_path_(false),
+              model_idx_(-1)
+  {
+        animation_func_ = nullptr;
+
+        // Initialize logging (if it has not been initialized yet)
+        if (!logging::is_initialized())
+            logging::initialize();
+
         // Avoid locale-related number parsing issues.
         setlocale(LC_NUMERIC, "C");
 
@@ -115,8 +126,9 @@ namespace easy3d {
         easy3d::connect(&camera_->frame_modified, this, &Viewer::update);
 
         kfi_ = new KeyFrameInterpolator(camera_->frame());
+        easy3d::connect(&kfi_->interpolation_stopped, this, &Viewer::update);
 
-        sprintf(gpu_time_, "fps: __ (__ ms/frame)");
+        sprintf(gpu_time_, "fps: ?? (?? ms/frame)");
 
         int fw, fh;
         glfwGetFramebufferSize(window_, &fw, &fh);
@@ -136,7 +148,9 @@ namespace easy3d {
             bool full_screen,
             bool resizable,
             int depth_bits,
-            int stencil_bits) {
+            int stencil_bits,
+            int width,
+            int height) {
         glfwSetErrorCallback(
                 [](int error, const char *desc) {
                     if (error == GLFW_NOT_INITIALIZED)
@@ -183,25 +197,23 @@ namespace easy3d {
         glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, resizable ? GL_TRUE : GL_FALSE);
 
-        int w = 960;
-        int h = 800;
         GLFWwindow *window = nullptr;
         if (full_screen) {
             GLFWmonitor *monitor = glfwGetPrimaryMonitor();
             const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-            w = mode->width;
-            h = mode->height;
-            window = glfwCreateWindow(w, h, title.c_str(), monitor, nullptr);
+            width = mode->width;
+            height = mode->height;
+            window = glfwCreateWindow(width, height, title.c_str(), monitor, nullptr);
         } else {
-            window = glfwCreateWindow(w, h, title.c_str(), nullptr, nullptr);
+            window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         }
 
         if (!window) {
             glfwTerminate();
-            LOG(ERROR) << "could not create an OpenGL " << std::to_string(gl_major)
-                       << "." << std::to_string(gl_minor) << " context!";
-            throw std::runtime_error("could not create an OpenGL " +
-                                     std::to_string(gl_major) + "." + std::to_string(gl_minor) + " context!");
+            std::string error_message = "could not create an OpenGL "
+                                        + std::to_string(gl_major) + "." + std::to_string(gl_minor) + " context!";
+            LOG(ERROR) << error_message;
+            throw std::runtime_error(error_message);
         }
         glfwSetWindowUserPointer(window, this);
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -643,7 +655,11 @@ namespace easy3d {
     bool Viewer::key_press_event(int key, int modifiers) {
         if (key == GLFW_KEY_F1 && modifiers == 0)
             std::cout << usage() << std::endl;
-
+        else if (key == GLFW_KEY_F2 && modifiers == 0) {
+            is_animating_ = !is_animating_;
+            if (is_animating_ && !animation_func_)
+                LOG(WARNING) << "animation is enabled but the animation function (i.e., animation_func_) is missing";
+        }
         else if (key == GLFW_KEY_LEFT && modifiers == 0) {
             float angle = static_cast<float>(1 * M_PI / 180.0); // turn left, 1 degrees each step
             camera_->frame()->action_turn(angle, camera_);
@@ -668,10 +684,18 @@ namespace easy3d {
         } else if (key == GLFW_KEY_DOWN && modifiers == EASY3D_MOD_CONTROL) {    // move camera down
             float step = 0.05f * camera_->sceneRadius();
             camera_->frame()->translate(camera_->frame()->inverseTransformOf(vec3(0.0, -step, 0.0)));
-        } else if (key == GLFW_KEY_A && modifiers == 0) {
+        } else if (key == GLFW_KEY_C && modifiers == EASY3D_MOD_CONTROL) {    // copy camera
+            copy_view();
+        } else if (key == GLFW_KEY_V && modifiers == EASY3D_MOD_CONTROL) {    // copy camera
+            paste_view();
+        }
+        else if (key == GLFW_KEY_A && modifiers == 0) {
             if (drawable_axes_)
                 drawable_axes_->set_visible(!drawable_axes_->is_visible());
-        } else if (key == GLFW_KEY_C && modifiers == 0) {
+        }
+        else if (key == GLFW_KEY_F && modifiers == EASY3D_MOD_CONTROL)
+            show_frame_rate_ = !show_frame_rate_;
+        else if (key == GLFW_KEY_C && modifiers == 0) {
             if (current_model())
                 fit_screen(current_model());
         } else if (key == GLFW_KEY_F && modifiers == 0) {
@@ -966,21 +990,22 @@ namespace easy3d {
 
         try {   // main loop
             static int frame_counter = 0;
-            double last_time = glfwGetTime();
+            double last_time = glfwGetTime();   // for frame rate counter
 
             while (!glfwWindowShouldClose(window_)) {
                 if (!glfwGetWindowAttrib(window_, GLFW_VISIBLE)) // not visible
                     continue;
 
-                glfwPollEvents();
-
-                // Calculate ms/frame
-                double current_time = glfwGetTime();
-                ++frame_counter;
-                if(current_time - last_time >= 2.0f) {
-                    sprintf(gpu_time_, "fps: %2.0f (%4.1f ms/frame)", double(frame_counter) / (current_time - last_time), 1000.0 / double(frame_counter));
-                    frame_counter = 0;
-                    last_time += 2.0f;
+                if (show_frame_rate_) {
+                    // Calculate ms/frame
+                    double current_time = glfwGetTime();
+                    ++frame_counter;
+                    if (current_time - last_time >= 1.0f) {
+                        sprintf(gpu_time_, "fps: %2.0f (%4.1f ms/frame)",
+                                double(frame_counter) / (current_time - last_time), 1000.0 / double(frame_counter));
+                        frame_counter = 0;
+                        last_time = current_time;
+                    }
                 }
 
                 pre_draw();
@@ -988,7 +1013,21 @@ namespace easy3d {
                 post_draw();
                 glfwSwapBuffers(window_);
 
-                glfwWaitEvents();
+                if (is_animating_ && animation_func_) {
+                    glfwPollEvents();
+
+                    // TODO: make framerate a parameter
+                    if (!show_frame_rate_) {
+                        static const int animation_fps = 30;
+                        static const double interval = 1000.0 / (animation_fps + 5); // the extra 5 for adjusting
+                        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(interval)));
+                    }
+                    animation_func_(*this);
+                }
+                else if (show_frame_rate_)
+                    glfwPollEvents();
+                else
+                    glfwWaitEvents();
             }
 
             /* Process events once more */
@@ -1027,14 +1066,15 @@ namespace easy3d {
                 " Easy3D viewer usage:                                              \n"
                 " ------------------------------------------------------------------\n"
                 "  F1:                  Help                                        \n"
-                " ------------------------------------------------------------------\n"
+                "  F2:                  Toggle animation (if available)             \n"
                 "  Ctrl + 'o':          Open file                                   \n"
                 "  Ctrl + 's':          Save file                                   \n"
                 "  Fn + Delete:         Delete current model                        \n"
                 "  '<' or '>':          Switch between models                       \n"
                 "  's':                 Snapshot                                    \n"
-                " ------------------------------------------------------------------\n"
                 "  'p':                 Toggle perspective/orthographic projection) \n"
+                "  'a':                 Toggle axes									\n"
+                "  Ctrl + 'f':          Toggle frame rate                           \n"
                 "  Left drag:           Rotate the camera                           \n"
                 "  Right drag:          Move the camera                             \n"
                 "  'x' + Left drag:     Rotate the camera around horizontal axis    \n"
@@ -1048,7 +1088,12 @@ namespace easy3d {
                 "  Ctrl + Left/Right:   Move camera left/right                      \n"
                 "  Up/Down:             Move camera forward/backward                \n"
                 "  Ctrl + Up/Down:      Move camera up/down                         \n"
-                " ------------------------------------------------------------------\n"
+                "  Ctrl + 'c':          Copy current view status to clipboard       \n"
+                "  Ctrl + 'v':          Restore view status from clipboard          \n"
+                "  Alt + 'k':           Add key frame to the camera path            \n"
+                "  Alt + 'd':           Delete the camera path                      \n"
+                "  Ctrl + 'k':          Play the camera path                        \n"
+                "  Ctrl + 't':          Toggle camera path                          \n"
                 "  'f':                 Fit screen (all models)                     \n"
                 "  'c':                 Fit screen (current model only)             \n"
                 "  'z' + Left click:    Zoom to target point on model               \n"
@@ -1056,10 +1101,8 @@ namespace easy3d {
                 "  Shift + Left click:  Define a target point on model              \n"
                 "  Shift + Right click: Undefine the target point (if any) on model \n"
                 "  Ctrl + Left drag:    Zoom to fit region                          \n"
-                " ------------------------------------------------------------------\n"
                 "  '-'/'=':             Decrease/Increase point size                \n"
                 "  '{'/'}':             Decrease/Increase line width                \n"
-                "  'a':                 Toggle axes									\n"
                 "  'b':                 Toggle borders								\n"
                 "  'e':                 Toggle edges							    \n"
                 "  'v':                 Toggle vertices                             \n"
@@ -1070,7 +1113,19 @@ namespace easy3d {
     }
 
 
-    Model *Viewer::add_model(const std::string &file_name, bool create_default_drawables) {
+    void Viewer::set_animation(bool b) {
+        is_animating_ = b;
+        update();
+    }
+
+
+    bool Viewer::is_animating() const {
+        return is_animating_ && animation_func_;
+    }
+
+
+    Model *Viewer::add_model(const std::string &file_path, bool create_default_drawables) {
+        const std::string file_name = file_system::convert_to_native_style(file_path);
         for (auto m : models_) {
             if (m->name() == file_name) {
                 LOG(WARNING) << "model has already been added to the viewer: " << file_name;
@@ -1190,7 +1245,7 @@ namespace easy3d {
 
     bool Viewer::delete_drawable(Drawable *drawable) {
         if (!drawable) {
-            LOG(WARNING) << "drawable is NULL.";
+            LOG(WARNING) << "drawable is NULL";
             return false;
         }
 
@@ -1370,16 +1425,16 @@ namespace easy3d {
             float base = 0.5f;   // the cylinder length, relative to the allowed region
             float head = 0.2f;   // the cone length, relative to the allowed region
             std::vector<vec3> points, normals, colors;
-            opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
-            opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
-            opengl::prepare_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
-            opengl::prepare_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
+            shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(base, 0, 0), vec3(1, 0, 0), points, normals, colors);
+            shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, base, 0), vec3(0, 1, 0), points, normals, colors);
+            shapes::create_cylinder(0.03, 10, vec3(0, 0, 0), vec3(0, 0, base), vec3(0, 0, 1), points, normals, colors);
+            shapes::create_cone(0.06, 20, vec3(base, 0, 0), vec3(base + head, 0, 0), vec3(1, 0, 0), points, normals,
                                  colors);
-            opengl::prepare_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
+            shapes::create_cone(0.06, 20, vec3(0, base, 0), vec3(0, base + head, 0), vec3(0, 1, 0), points, normals,
                                  colors);
-            opengl::prepare_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
+            shapes::create_cone(0.06, 20, vec3(0, 0, base), vec3(0, 0, base + head), vec3(0, 0, 1), points, normals,
                                  colors);
-            opengl::prepare_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
+            shapes::create_sphere(vec3(0, 0, 0), 0.06, 20, 20, vec3(0, 1, 1), points, normals, colors);
             const_cast<Viewer*>(this)->drawable_axes_ = new TrianglesDrawable("corner_axes");
             drawable_axes_->update_vertex_buffer(points);
             drawable_axes_->update_normal_buffer(normals);
@@ -1415,6 +1470,8 @@ namespace easy3d {
 
         program->bind();
         program->set_uniform("MVP", MVP)
+                ->set_uniform("MANIP", mat4::identity())
+                ->set_uniform("NORMAL", mat3::identity())   // needs be padded when using uniform blocks
                 ->set_uniform("lighting", true)
                 ->set_uniform("two_sides_lighting", false)
                 ->set_uniform("smooth_shading", true)
@@ -1426,8 +1483,10 @@ namespace easy3d {
                 ->set_block_uniform("Material", "ambient", setting::material_ambient)
                 ->set_block_uniform("Material", "specular", setting::material_specular)
                 ->set_block_uniform("Material", "shininess", &setting::material_shininess)
-                ->set_uniform("highlight_id_min", -1)
-                ->set_uniform("highlight_id_max", -1);
+                ->set_uniform("highlight", false)
+                ->set_uniform("clippingPlaneEnabled", false)
+                ->set_uniform("selected", false)
+                ->set_uniform("use_texture", false);
         drawable_axes_->gl_draw();
         program->release();
 
@@ -1453,12 +1512,15 @@ namespace easy3d {
             const float offset = 20.0f * dpi_scaling();
             texter_->draw("Easy3D", offset, offset, font_size, 0);
 
-            texter_->draw(gpu_time_, offset, 50.0f * dpi_scaling(), 16, 1);
+            if (show_frame_rate_)
+                texter_->draw(gpu_time_, offset, 50.0f * dpi_scaling(), 16, 1);
         }
 
         // shown only when it is not animating
-        if (show_camera_path_ && !kfi_->is_interpolation_started())
-            kfi_->draw_path(camera(), camera()->sceneRadius() * 0.05f);
+        if (show_camera_path_ && !kfi_->is_interpolation_started()) {
+            kfi_->draw_path(camera_, 2.0f);
+            kfi_->draw_cameras(camera_, camera()->sceneRadius() * 0.05f);
+        }
 
         if (show_pivot_point_) {
             ShaderProgram *program = ShaderManager::get_program("lines/lines_plain_color");
@@ -1502,11 +1564,11 @@ namespace easy3d {
             const Rect rect(mouse_pressed_x_, mouse_current_x_, mouse_pressed_y_, mouse_current_y_);
             if (rect.width() > 0 || rect.height() > 0) {
                 // draw the boundary of the rect
-                opengl::draw_quad_wire(rect, vec4(0.0f, 0.0f, 1.0f, 1.0f), width(), height(), -1.0f);
+                shapes::draw_quad_wire(rect, vec4(0.0f, 0.0f, 1.0f, 1.0f), width(), height(), -1.0f);
                 // draw the transparent face
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                opengl::draw_quad_filled(rect, vec4(0.0f, 0.0f, 1.0f, 0.2f), width(), height(), -0.9f);
+                shapes::draw_quad_filled(rect, vec4(0.0f, 0.0f, 1.0f, 0.2f), width(), height(), -0.9f);
                 glDisable(GL_BLEND);
             }
         }
@@ -1557,6 +1619,54 @@ namespace easy3d {
             if (depth < 1.0 && p.z < 1.0 && std::abs(depth - p.z) < 0.001)
                 texter->draw(std::to_string(id), x, p.y * dpi_scaling_, 16, font_id, color);
         }
+    }
+
+
+    void Viewer::copy_view() {
+        const vec3 pos = camera()->position();
+        const quat q = camera()->orientation();
+
+        std::stringstream stream;
+        stream << pos[0] << ' '
+                << pos[1] << ' '
+                << pos[2] << ' '
+                << q[0] << ' '
+                << q[1] << ' '
+                << q[2] << ' '
+                << q[3];
+        glfwSetClipboardString(window_, stream.str().c_str());
+    }
+
+
+    void Viewer::paste_view() {
+        // get the camera parameters from clipboard string
+        const std::string str = glfwGetClipboardString(window_);
+        std::vector<std::string> list;
+        string::split(str, ' ', list, true);
+        if (list.size() != 7) {
+            LOG(WARNING) << "camera not available in clipboard";
+            return;
+        }
+
+        vec3 pos;
+        for (int i = 0; i < 3; ++i)
+            pos[i] = std::stof(list[i]);
+        quat orient;
+        for (int i = 0; i < 4; ++i)
+            orient[i] = std::stof(list[i + 3]);
+
+        //////////////////////////////////////////////////////////////////////////
+        // change view directly
+        // 	camera()->setPosition(pos);
+        // 	camera()->setOrientation(orient);
+        // I prefer to make animation
+        Frame new_frame;
+        new_frame.setPosition(pos);
+        new_frame.setOrientation(orient);
+        const float duration = 0.5f;
+        camera()->interpolateTo(new_frame, duration);
+
+        update();
     }
 
 

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #ifndef EASY3D_TUTORIAL_REAL_CAMERA_H
 #define EASY3D_TUTORIAL_REAL_CAMERA_H
@@ -35,6 +35,7 @@
 namespace easy3d {
     class Camera;
     class Texture;
+    class LinesDrawable;
 }
 
 class RealCamera : public easy3d::Viewer
@@ -47,8 +48,6 @@ public:
 protected:
     bool key_press_event(int key, int modifiers) override;
 
-    void draw() const override;
-
     std::string usage() const override ;
     
 private:
@@ -56,8 +55,8 @@ private:
         int w, h;           // image size
         float fx, fy;       // focal length
         float cx, cy;       // principal point
-        float rx, ry, rz;   // rotation in angle-axis format
-        float tx, ty, tz;   // the translation
+        easy3d::mat3 R;     // rotation
+        easy3d::vec3 t;     // the translation
     };
     std::vector<CameraPara> views_;
     int current_view_;
@@ -65,16 +64,17 @@ private:
     bool read_bundler_file(const std::string& file_name);
     
     // K [R T] -> easy3d camera representation
-    bool KRT_to_camera(int view_index, int method, easy3d::Camera* c);
+    bool KRT_to_camera(int view_index, easy3d::Camera* c, bool ground_truth);
     
-    void create_cameras_drawable();
-
-    void draw_image() const;
+    void update_cameras_drawable(bool ground_truth);
 
     void load_image();
 
+    void post_draw() override;
+
 private:
     easy3d::Texture* texture_;
+    easy3d::LinesDrawable* cameras_drwable_;
 };
 
 

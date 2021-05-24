@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 /** ----------------------------------------------------------
  *
@@ -602,7 +602,7 @@ namespace easy3d {
         {
             if ( !is_border(vertices[i]) )
             {
-                LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex vertex (" << vertices[i] << "). " << COUNTER;
+                LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex vertex (" << vertices[i] << "). " << COUNTER;
 
 #ifndef NDEBUG
                 static bool show = true;
@@ -622,7 +622,7 @@ namespace easy3d {
 
             if (!is_new[i] && !is_border(halfedges[i]))
             {
-                LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edge (" << vertices[i] << " -> " << vertices[ii] << "). " << COUNTER;
+                LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edge (" << vertices[i] << " -> " << vertices[ii] << "). " << COUNTER;
 
 #ifndef NDEBUG
                 static bool show = true;
@@ -670,7 +670,7 @@ namespace easy3d {
                     // ok ?
                     if (boundary_next == inner_next)
                     {
-                        LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: patch re-linking failed (" << vertices << "). " << COUNTER;
+                        LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: patch re-linking failed (" << vertices << "). " << COUNTER;
 #ifndef NDEBUG
                         static bool show = true;
                         if (show) {
@@ -691,7 +691,7 @@ namespace easy3d {
                     if (!boundary_prev.is_valid() || !patch_start.is_valid() || !patch_end.is_valid() ||
                         !boundary_next.is_valid() || !inner_prev.is_valid() || !inner_next.is_valid())
                     {
-                        LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                        LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                         static bool show = true;
                         if (show) {
                             LOG(ERROR) << "\tvertices of the face: ";
@@ -751,7 +751,7 @@ namespace easy3d {
 #ifndef NDEBUG
                         if (!boundary_prev.is_valid() || !outer_next.is_valid())
                         {
-                            LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                            LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                             static bool show = true;
                             if (show) {
                                 LOG(ERROR) << "\tvertices of the face: ";
@@ -770,7 +770,7 @@ namespace easy3d {
 #ifndef NDEBUG
                         if (!outer_prev.is_valid() || !boundary_next.is_valid())
                         {
-                            LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                            LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                             static bool show = true;
                             if (show) {
                                 LOG(ERROR) << "\tvertices of the face: ";
@@ -791,7 +791,7 @@ namespace easy3d {
 #ifndef NDEBUG
                             if (!outer_prev.is_valid() || !outer_next.is_valid())
                             {
-                                LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                                LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                                 static bool show = true;
                                 if (show) {
                                     LOG(ERROR) << "\tvertices of the face: ";
@@ -810,7 +810,7 @@ namespace easy3d {
 #ifndef NDEBUG
                             if (!boundary_prev.is_valid() || !outer_next.is_valid() || !outer_prev.is_valid() || !boundary_next.is_valid())
                             {
-                                LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                                LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                                 static bool show = true;
                                 if (show) {
                                     LOG(ERROR) << "\tvertices of the face: ";
@@ -830,7 +830,7 @@ namespace easy3d {
 #ifndef NDEBUG
                 if (!inner_prev.is_valid() || !inner_next.is_valid())
                 {
-                    LOG_FIRST_N(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
+                    LOG_N_TIMES(3, ERROR) << "SurfaceMesh::add_face: complex edges (" << vertices << "). " << COUNTER;
                     static bool show = true;
                     if (show) {
                         LOG(ERROR) << "\tvertices of the face: ";
@@ -1184,8 +1184,9 @@ namespace easy3d {
             return nn;
         };
 
-        if (!fnormal_)
-            update_face_normals();
+        // always re-compute face normals
+        update_face_normals();
+
         for (vit=vertices_begin(); vit!=vend; ++vit)
             vnormal_[*vit] = angle_weighted_face_normals(*vit);
 #endif

@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 /** ----------------------------------------------------------
  *
@@ -990,15 +990,47 @@ namespace easy3d {
 
 
     void Camera::set_from_calibration(float fx, float fy, float skew, float cx, float cy,
-                                      const vec3 &rot, const vec3 &t)
+                                      const mat3 &R, const vec3 &t, bool convert)
     {
+        // The two methods give the same results, both assuming that image_height equals to (2.0 * cy).
+        // This is not accurate and the error seems mainly due to the inaccuracy in cy (because from calibration, cy
+        // may not be exactly at the image center).
+        // Suggestion: use the image height (usually known in practice) to compute the field of view.
+
+#if 0
+
+        const quat q(inverse(R));  // the inverse rotation represented by a quaternion
+        if (convert)
+            setOrientation(q);  // this already includes the conversion
+        else {
+            mat3 flip(1.0f);
+            flip(1, 1) = -1;   // invert the y axis
+            flip(2, 2) = -1;   // invert the z axis
+            setOrientation(q * quat(flip));
+        }
+
+        const vec3 pos = t;
+        setPosition(-q.rotate(pos));    // camera position: -inverse(rot) * t
+
+        // http://ksimek.github.io/2013/06/18/calibrated-cameras-and-gluperspective/
+        // https://github.com/opencv/opencv/blob/82f8176b0634c5d744d1a45246244291d895b2d1/modules/calib3d/src/calibration.cpp#L1820
+        // We assume image_height = (2.0 * cy). However, cy may not be exactly at the image center.
+        const float proj11 = 2.0f * fy / (2.0 * cy); // proj[1][1]
+        // Liangliang: if we replace (2.0f * cy) by image_height, the result can be more accurate, i.e.,
+        //const float proj11 = 2.0f * fy / image_height; // this will be more accurate
+        
+        const float fov = 2.0f * std::atan(1.0f / proj11);
+        setFieldOfView(fov);
+
+#else
+
         /**-------------------------------------------------------------------
          * It took me quite a while to figure out this.
          * The OpengGL projection and modelview matrices can be computed as follows.
          * Particle Filtering with Rendered Models: A Two Pass Approach to Multi-object 3D Tracking with the GPU)
-         * http://cvrr.ucsd.edu/publications/2008/MurphyChutorian_Trivedi_CVGPU08.pdf
+         *      http://cvrr.ucsd.edu/publications/2008/MurphyChutorian_Trivedi_CVGPU08.pdf
          * More detailed explanation can be found here:
-         * http://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/
+         *      http://ksimek.github.io/2013/06/03/calibrated_cameras_in_opengl/
          *-------------------------------------------------------------------*/
         //const mat4 proj(
         //                2.0 * fx / w,  -2.0 * skew / w,  1.0 - 2.0 * cx/w,          0.0,
@@ -1007,16 +1039,22 @@ namespace easy3d {
         //                0.0,            0.0,            -1.0,                       0.0
         //                );
         //
-        // I doubt the implementation of this function.
         const mat3 K(
                     fx, skew, cx,
                     0,  fy,   cy,
                     0,  0,    1);
-        const mat4 R = mat4::rotation(rot);
+        const mat4 Rot(R);
         const mat4 T = mat4::translation(t);
 
-        const mat34& proj = K * mat34(1.0) * T * R;
-        set_from_projection_matrix(proj);
+        mat34 M(1.0);
+        if (convert) {
+            M(1, 1) = -1;   // invert the y axis
+            M(2, 2) = -1;   // invert the z axis
+        }
+
+        const mat34& proj = K * M * T * Rot;
+        set_from_calibration(proj);
+#endif
     }
 
 
@@ -1032,10 +1070,6 @@ namespace easy3d {
 	 Its three lines correspond to the homogeneous coordinates of the normals to the
 	 planes x=0, y=0 and z=0, defined in the Camera coordinate system.
 
-	 The elements of the matrix are ordered in line major order: you can call \c
-	 setFromProjectionMatrix(&(matrix[0][0])) if you defined your matrix as a \c
-	 double \c matrix[3][4].
-
 	 \attention Passing the result of getProjectionMatrix() or getModelViewMatrix()
 	 to this method is not possible (purposefully incompatible matrix dimensions).
 	 \p matrix is more likely to be the product of these two matrices, without the
@@ -1045,8 +1079,9 @@ namespace easy3d {
 	 GL_MODELVIEW matrix. fieldOfView() can also be retrieved from a \e perspective
 	 \c GL_PROJECTION matrix using 2.0 * atan(1.0/projectionMatrix[5]).
 
-	 This code was written by Sylvain Paris. */
-    void Camera::set_from_projection_matrix(const mat34 &proj) {
+	 This code was written by Sylvain Paris. Modified and bug fixed by Liangliang Nan.
+	 */
+    void Camera::set_from_calibration(const mat34 &proj) {
 		// The 3 lines of the matrix are the normals to the planes x=0, y=0, z=0
 		// in the camera CS. As we normalize them, we do not need the 4th coordinate.
         vec3 line_0 = proj.row(0);	line_0.normalize();
@@ -1060,7 +1095,7 @@ namespace easy3d {
 		// divide the first 3 coordinates by the 4th one.
 
 		// We derive the 4 dimensional vectorial product formula from the
-		// computation of a 4x4 determinant that is developped according to
+		// computation of a 4x4 determinant that is developed according to
 		// its 4th column. This implies some 3x3 determinants.
         const mat3 m1(
 			proj(0, 1), proj(0, 2), proj(0, 3),
@@ -1096,26 +1131,29 @@ namespace easy3d {
 
 		// X-axis is almost like line_0 but should be orthogonal to the Z axis.
 		vec3 column_0 = cross(cross(column_2, line_0), column_2);
-		column_0 = normalize(column_0);
+		column_0.normalize();
 
 		// Y-axis is almost like line_1 but should be orthogonal to the Z axis.
 		// Moreover line_1 is downward oriented as the screen CS.
 		vec3 column_1 = -cross(cross(column_2, line_1), column_2);
-		column_1 = normalize(column_1);
+		column_1.normalize();
 
         const mat3 rot(column_0, column_1, column_2);
 
-		// We compute the field of view
+		// We compute the field of view.
+        // The fov computation in this function assumes that image_height = (2.0 * cy). So it is equivalent to
+        //      const float proj11 = 2.0f * fy / (2.0f * cy);
+        //      const float fov = 2.0f * atan(1.0f / proj11);
+        // However in practice, cy may not be exactly at the image center. To get an accurate fov, the actual image
+        // height should be used.
+        // TODO: add image size as argument to this function
 
-		// line_1^column_0 -> vector of intersection line between
-		// y_screen=0 and x_camera=0 plane.
-		// column_2*(...)  -> cos of the angle between Z vector et y_screen=0 plane
+		// cross(line_1, column_0) -> vector of intersection line between y_screen=0 and x_camera=0 plane.
+		// column_2 * (...)  -> cos of the angle between Z vector and y_screen=0 plane
 		// * 2 -> field of view = 2 * half angle
-
-		// We need some intermediate values.
-        vec3 dummy = cross(line_1, column_0);
-		dummy = normalize(dummy);
-		const float fov = std::acos(dot(column_2, dummy)) * 2.0f;
+        vec3 intersection = cross(line_1, column_0); // vector of intersection line between y_screen=0 and x_camera=0 plane.
+        intersection.normalize();
+		const float fov = std::acos(dot(column_2, intersection)) * 2.0f;
 
 		// We set the camera.
 		quat q;
@@ -1124,6 +1162,7 @@ namespace easy3d {
 		setPosition(cam_pos);
 		setFieldOfView(fov);
 	}
+
 
 	///////////////////////// Camera to world transform ///////////////////////
 
@@ -1211,6 +1250,11 @@ namespace easy3d {
 			tmp = frame->inverseCoordinatesOf(src);
 
 		const mat4& mvp = modelViewProjectionMatrix();
+
+		// todo: dpi_scaling is not handled.
+		//       should use the actual viewpoint size; or multiply the dpi scaling factor
+		// int viewport[4];
+		// glGetIntegerv(GL_VIEWPORT, viewport);
 		const int viewport[] = { 0, 0, screenWidth_, screenHeight_ };
 		vec3 vs = mvp * tmp * 0.5f + vec3(0.5f);
 		vs.x = vs.x * viewport[2] + viewport[0];

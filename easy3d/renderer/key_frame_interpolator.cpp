@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 /** ----------------------------------------------------------
  *
@@ -40,7 +40,7 @@
 #include <easy3d/renderer/frame.h>
 #include <easy3d/renderer/drawable_lines.h>
 #include <easy3d/renderer/drawable_triangles.h>
-#include <easy3d/renderer/primitives.h>
+#include <easy3d/renderer/shapes.h>
 #include <easy3d/renderer/camera.h>   // for drawing the camera path drawables
 #include <easy3d/core/spline_curve_fitting.h>
 #include <easy3d/core/spline_curve_interpolation.h>
@@ -69,7 +69,7 @@ namespace easy3d {
     }
 
 
-    void KeyFrameInterpolator::add_keyframe(const Frame &frame) {
+    bool KeyFrameInterpolator::add_keyframe(const Frame &frame) {
         // interval of each consecutive keyframes is 1.0 sec.
         float time = 0.0f;
         if (keyframes_.empty())
@@ -77,20 +77,32 @@ namespace easy3d {
         else
             time = keyframes_.back().time() + 1.0f;
 
-        add_keyframe(frame, time);
+        return add_keyframe(frame, time);
     }
 
 
-    void KeyFrameInterpolator::add_keyframe(const Frame &frame, float time) {
-        if ((!keyframes_.empty()) && (keyframes_.back().time() >= time))
+    bool KeyFrameInterpolator::add_keyframe(const Frame &frame, float time) {
+        if ((!keyframes_.empty()) && (keyframes_.back().time() >= time)) {
             LOG(ERROR) << "time is not monotone";
-        else {
-            keyframes_.emplace_back(Keyframe(frame, time));
+            return false;
         }
+        else {
+            // detect and eliminate duplicated camera positions
+            if (!keyframes_.empty()) {
+                const float sd = distance2(keyframes_.back().position(), frame.position());
+                if (sd < epsilon_sqr<float>()) {
+                    LOG(WARNING) << "could not add keyframe: camera position too close to the previous one (distance: "
+                                 << std::sqrt(sd) << ")";
+                    return false;
+                }
+            }
 
-        pathIsValid_ = false;
-        last_stopped_index_ = 0; // may not be valid any more
-        stop_interpolation();
+            keyframes_.emplace_back(Keyframe(frame, time));
+            pathIsValid_ = false;
+            last_stopped_index_ = 0; // may not be valid any more
+            stop_interpolation();
+            return true;
+        }
     }
 
 
@@ -200,8 +212,8 @@ namespace easy3d {
 
     void KeyFrameInterpolator::start_interpolation() {
         auto animation = [this]() {
-            // interval in ms. (0.9 to approximately compensate the overhead the timer thread and viewer update)
-            const int interval = 1000.0f / frame_rate() * 0.9f;
+            // interval in ms (0.9 to approximately compensate the overhead the timer thread and viewer update)
+            const int interval = static_cast<int>(1000.0f / frame_rate() * 0.9f);
             for (int id = last_stopped_index_; id < interpolated_path_.size(); ++id) {
                 if (timer_.is_stopped()) {
                     last_stopped_index_ = id;
@@ -262,8 +274,8 @@ namespace easy3d {
             for (std::size_t i = 0; i < keyframes_.size(); ++i) {
                 std::vector<vec3> cam_points;
                 std::vector<unsigned int> cam_indices;
-                opengl::prepare_camera(cam_points, cam_indices, camera_width,
-                                       static_cast<float>(camera->screenHeight()) / camera->screenWidth());
+                shapes::create_camera(cam_points, cam_indices, camera_width, camera->fieldOfView(),
+                                      static_cast<float>(camera->screenHeight()) / camera->screenWidth());
                 unsigned int offset = points.size();
                 for (auto id : cam_indices)
                     indices.push_back(offset + id);

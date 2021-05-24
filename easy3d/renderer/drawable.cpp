@@ -1,5 +1,5 @@
-/**
- * Copyright (C) 2015 by Liangliang Nan (liangliang.nan@gmail.com)
+/********************************************************************
+ * Copyright (C) 2015 Liangliang Nan <liangliang.nan@gmail.com>
  * https://3d.bk.tudelft.nl/liangliang/
  *
  * This file is part of Easy3D. If it is useful in your research/work,
@@ -20,7 +20,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
+ ********************************************************************/
 
 #include <easy3d/renderer/drawable.h>
 
@@ -117,33 +117,32 @@ namespace easy3d {
 
     void Drawable::internal_update_buffers() {
         if (!model_ && !update_func_) {
-            LOG_FIRST_N(3, ERROR)
-                << "updating buffers failed: drawable not associated with a model and no update function specified. " << COUNTER;
+            LOG_N_TIMES(3, ERROR)
+                << "updating rendering buffers failed: drawable not associated with a model and no update function specified. " << COUNTER;
             return;
         } else if (model_ && model_->points().empty()) {
             clear();
-            LOG_FIRST_N(3, WARNING) << "model has no valid geometry. " << COUNTER;
+            LOG_N_TIMES(3, WARNING) << "model has no valid geometry. " << COUNTER;
             return;
         }
-
-        LOG(INFO) << "updating rendering buffers...";
 
         StopWatch w;
         if (update_func_)
             update_func_(model_, this);
-        else {
+        else
             buffers::update(model_, this);
-        }
-        LOG_IF(w.elapsed_seconds() > 0.5, INFO) << "rendering buffers updated. " << w.time_string();
+
+        LOG_IF(w.elapsed_seconds() > 0.5, INFO) << "updating rendering buffers for drawable '" << name()
+                                                << "' took " << w.time_string();
         update_needed_ = false;
     }
 
 
-    void Drawable::update_vertex_buffer(const std::vector<vec3> &vertices) {
+    void Drawable::update_vertex_buffer(const std::vector<vec3> &vertices, bool dynamic) {
         assert(vao_);
 
         bool success = vao_->create_array_buffer(vertex_buffer_, ShaderProgram::POSITION, vertices.data(),
-                                                 vertices.size() * sizeof(vec3), 3);
+                                                 vertices.size() * sizeof(vec3), 3, dynamic);
 
         LOG_IF(!success, ERROR) << "failed creating vertex buffer";
 
@@ -164,28 +163,28 @@ namespace easy3d {
     }
 
 
-    void Drawable::update_color_buffer(const std::vector<vec3> &colors) {
+    void Drawable::update_color_buffer(const std::vector<vec3> &colors, bool dynamic) {
         assert(vao_);
 
         bool success = vao_->create_array_buffer(color_buffer_, ShaderProgram::COLOR, colors.data(),
-                                                 colors.size() * sizeof(vec3), 3);
+                                                 colors.size() * sizeof(vec3), 3, dynamic);
         LOG_IF(!success, ERROR) << "failed updating color buffer";
     }
 
 
-    void Drawable::update_normal_buffer(const std::vector<vec3> &normals) {
+    void Drawable::update_normal_buffer(const std::vector<vec3> &normals, bool dynamic) {
         assert(vao_);
         bool success = vao_->create_array_buffer(normal_buffer_, ShaderProgram::NORMAL, normals.data(),
-                                                 normals.size() * sizeof(vec3), 3);
+                                                 normals.size() * sizeof(vec3), 3, dynamic);
         LOG_IF(!success, ERROR) << "failed updating normal buffer";
     }
 
 
-    void Drawable::update_texcoord_buffer(const std::vector<vec2> &texcoords) {
+    void Drawable::update_texcoord_buffer(const std::vector<vec2> &texcoords, bool dynamic) {
         assert(vao_);
 
         bool success = vao_->create_array_buffer(texcoord_buffer_, ShaderProgram::TEXCOORD, texcoords.data(),
-                                                 texcoords.size() * sizeof(vec2), 2);
+                                                 texcoords.size() * sizeof(vec2), 2, dynamic);
         LOG_IF(!success, ERROR) << "failed updating texcoord buffer";
     }
 
