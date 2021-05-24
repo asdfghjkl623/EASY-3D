@@ -18,11 +18,9 @@ bibliography: paper.bib
 
 # Summary
 
-*Easy3D* is an open-source library for 3D modeling, geometry processing, and rendering. It is implemented in C++ and designed with an emphasis on simplicity (i.e., processing and visualizing 3D data can be achieved by few lines of API calls) and efficiency (i.e., it takes advantage of the powerful GPUs of nowadays for visualization). The contributions of *Easy3D* are threefold: (1) efficient data structures for representing common 3D data (i.e., point clouds, surface meshes, polyhedral meshes, and graphs), (2) commonly used algorithms for processing 3D data, and (3) standard techniques for the visualization of 3D data. The data structures (see \autoref{fig:datastructures}), geometry processing algorithms, and rendering techniques (see \autoref{fig:rendering}) can be easily seamlessly integrated for the fast development of research prototypes or 3D applications.  shows an overview of the rendering functionalities provided by *Easy3D*. 
+*Easy3D* is an open-source library for 3D modeling, geometry processing, and rendering. It is implemented in C++ and designed with an emphasis on simplicity (i.e., processing and visualizing 3D data can be achieved by few lines of API calls) and efficiency (i.e., it takes advantage of the powerful GPUs of nowadays for visualization). The contributions of *Easy3D* are threefold: (1) efficient data structures for representing common 3D data (i.e., point clouds, surface meshes, polyhedral meshes, and graphs), (2) commonly used algorithms for processing 3D data, and (3) standard techniques for the visualization of 3D data. The data structures (see \autoref{fig:datastructures}), geometry processing algorithms, and rendering techniques (see \autoref{fig:rendering}) can be seamlessly and easily integrated for the fast development of research prototypes or 3D applications. \autoref{fig:rendering} shows an overview of the rendering functionalities provided by *Easy3D*. 
 
 ![The data structures provided by Easy3D. From left to right: point cloud, surface mesh, polyhedral meshes, and graph. \label{fig:datastructures}](datastructures.png)
-
-![An overview of the rendering functionalities of Easy3D. \label{fig:rendering}](rendering.png)
 
 # Statement of need
 
@@ -31,6 +29,8 @@ The amount of 3D data has been explosively increasing in the past decades, drive
 The development of end-to-end 3D data processing software typically requires integrating different functionalities such as data structures (for representing and storing 3D data), algorithms (for processing and analysis), and rendering (for visualizing the data and the derived information). However, each of these open-source software has a particular focus and it is not an easy task to integrate the functionalities provided by different software packages. For example, MeshLab [@meshlab:2008] and CloudCompare [@cloudcompare:2016]) focus on easy-to-use GUIs (Graphical User Interface) for processing meshes and point clouds, respectively. The libigl [@libigl:2016] and PMP [@pmp:2020] have an emphasis on the implementation of state-of-the-are mesh processing algorithms, lacking rendering and interactive capabilities. As a result, the development process has a high demand for the expertise of a developer in all the related aspects. 
 
 To facilitate the fast development of 3D data processing software, *Easy3D* provides not only the data structures, but also commonly used geometry processing algorithms, and standard rendering techniques. All these functionalities can be seamlessly integrated into a software implementation.
+
+![An overview of the rendering functionalities of Easy3D. \label{fig:rendering}](rendering.png)
 
 # Overview of the features
 
