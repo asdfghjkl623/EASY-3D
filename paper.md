@@ -10,7 +10,7 @@ authors:
     orcid: 0000-0002-5629-9975
     affiliation: 1
 affiliations:
- - name: 3D Geoinformation Research Group, Delft University of Technology
+ - name: 3D Geoinformation Research Group, Delft University of Technology, the Netherlands
    index: 1
 date: 2 December 2020
 bibliography: paper.bib
