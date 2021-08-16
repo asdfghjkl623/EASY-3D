@@ -49,7 +49,7 @@ The core features of *Easy3D* include:
 - A viewer that can be used directly to visualize 3D scenes in various formats, which can also be easily extended. A handy tool *Mapple* created out of the *Easy3D* library for rendering and processing 3D data.
 
 
-*Easy3D* was initially designed with an intention for research and educational purposes, while its wide range of features also enables developing sophisticated 3D applications. *Easy3D* has been widely used by graduate students in courses and research projects and has enabled several scientific publications, e.g., @adtree:2019 and @adqsm:2020.
+*Easy3D* was initially designed with an intention for research and educational purposes, while its wide range of features also enables developing sophisticated 3D applications. *Easy3D* has been widely used by graduate students in courses and research projects and has enabled several scientific publications, e.g., @adtree:2019, @adqsm:2020, and @sum:2021.
 
 
 # Acknowledgements
