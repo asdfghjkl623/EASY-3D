@@ -24,7 +24,7 @@ bibliography: paper.bib
 
 # Statement of need
 
-The amount of 3D data has been explosively increasing in the past decades, driven by the fast development of data acquisition techniques (e.g., laser scanning, photogrammetry, and 3D computer vision) and real-world applications (e.g., urban planning, autonomous driving, surveying, and entertainment). The processing and application of such data require specialized algorithms and software systems, for which great tools and algorithm libraries have been developed, such as MeshLab [@meshlab:2008], CloudCompare [@cloudcompare:2016], CGAL [@cgal:2009],libigl [@libigl:2016], and PMP [@pmp:2020]. 
+The amount of 3D data has been explosively increasing in the past decades, driven by the fast development of data acquisition techniques (e.g., laser scanning, photogrammetry, and 3D computer vision) and real-world applications (e.g., urban planning, autonomous driving, surveying, and entertainment). The processing and application of such data require specialized algorithms and software systems, for which great tools and algorithm libraries have been developed, such as MeshLab [@meshlab:2008], CloudCompare [@cloudcompare:2016], CGAL [@cgal:2009], libigl [@libigl:2016], and PMP [@pmp:2020]. 
 
 The development of end-to-end 3D data processing software typically requires integrating different functionalities such as data structures (for representing and storing 3D data), algorithms (for processing and analysis), and rendering (for visualizing the data and the derived information). However, each of these open-source software has a particular focus and it is not an easy task to integrate the functionalities provided by different software packages. For example, MeshLab [@meshlab:2008] and CloudCompare [@cloudcompare:2016]) focus on easy-to-use GUIs (Graphical User Interface) for processing meshes and point clouds, respectively. The CGAL [@cgal:2009], libigl [@libigl:2016], and PMP [@pmp:2020] have an emphasis on the implementation of sophisticated mesh processing algorithms, lacking rendering and interactive capabilities. As a result, the development process has a high demand for the expertise of a developer in all the related aspects. 
 
@@ -49,7 +49,11 @@ The core features of *Easy3D* include:
 - A viewer that can be used directly to visualize 3D scenes in various formats, which can also be easily extended. A handy tool *Mapple* created out of the *Easy3D* library for rendering and processing 3D data.
 
 
-
 *Easy3D* was initially designed with an intention for research and educational purposes, while its wide range of features also enables developing sophisticated 3D applications. *Easy3D* has been widely used by graduate students in courses and research projects and has enabled several scientific publications, e.g., @adtree:2019 and @adqsm:2020.
+
+
+# Acknowledgements
+The implementation of *Easy3D* greatly benefited from and was inspired by existing great open-source libraries, such as CGAL [@cgal:2009], libigl [@libigl:2016], and PMP [@pmp:2020]]. We would like to thank the original authors of these projects for their permissive license terms. We also thank the users, contributors, and JOSS reviewers for reporting/fixing bugs, testing, and providing valuable feedback and suggestions.
+
 
 # References
