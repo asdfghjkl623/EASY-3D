@@ -5,13 +5,13 @@ project(${PROJECT_NAME})
 
 
 set(${PROJECT_NAME}_HEADERS
-    main_window.h
+    viewer.h
     panel.h
     plugin.h
     )
 
 set(${PROJECT_NAME}_SOURCES
-    main_window.cpp
+    viewer.cpp
     panel.cpp
     plugin.cpp
     )
@@ -21,9 +21,4 @@ add_library(${PROJECT_NAME} STATIC ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_
 
 set_target_properties(${PROJECT_NAME} PROPERTIES FOLDER "applications")
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glew_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_glfw_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${MAPPLE_imgui_INCLUDE_DIR})
-target_include_directories(${PROJECT_NAME} PRIVATE ${EASY3D_INCLUDE_DIR})
-
-target_link_libraries(${PROJECT_NAME} glew glfw imgui core)
+target_link_libraries(${PROJECT_NAME} 3rd_glew 3rd_glfw 3rd_imgui easy3d_core)

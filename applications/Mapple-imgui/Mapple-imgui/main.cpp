@@ -23,58 +23,27 @@
 *	along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <iostream>
-#include <algorithm>
-
-#include <easy3d/util/file.h>
 #include <easy3d/util/logging.h>
 
+#include "../window/viewer.h"
 #include "../window/panel.h"
-#include "mapple.h"
 #include "plugin_polyfit.h"
-
 
 using namespace easy3d;
 
-int main(int argc, char** argv) {
-    try {
-        // Initialize Google's logging library.
-        const std::string& dir = file::get_current_working_directory();
-        const std::string log_dir = dir + "/logs/";
-        if (!easy3d::file::is_directory(log_dir))
-            easy3d::file::create_directory(log_dir);
-        google::SetLogDestination(google::GLOG_INFO, log_dir.c_str());
-        google::SetLogFilenameExtension("Mapple_log-");
-    #ifndef NDEBUG
-        FLAGS_stderrthreshold = google::GLOG_INFO;   // requires gflags
-    #else
-        FLAGS_stderrthreshold = google::GLOG_WARNING;   // requires gflags
-    #endif
-        FLAGS_colorlogtostderr = true;                  // requires gflags
-        google::InitGoogleLogging(argv[0]);
-        LOG(INFO) << "Current working directory: " << dir;
+int main(int argc, char **argv) {
+    // Initialize logging.
+    logging::initialize();
 
-        Mapple app(4, 3, 2);
+    ViewerImGui app;
 
- 		Panel pan(&app, "Rendering Panel");
- 		PluginPolyFit  polyfit(&pan);
+    auto panel = new Panel(&app, "Rendering Panel");
+    auto plugin = new PluginPolyFit(panel, "PolyFit");
+    panel->add_plugin(plugin);
 
-#if 0
-		Panel win2(&app, "Model Panel");
-		PluginPolyFit polyfit2(&win2);
+    app.add_panel(panel);
 
-		Panel win3(&app, "Model Panel##3");
-		PluginPolyFit polyfit3(&win3);
-#endif
+    app.resize(800, 600);
 
-        app.resize(800, 600);
-		app.run();
-
-    } catch (const std::runtime_error &e) {
-        std::string error_msg = std::string("Caught a fatal error: ") + std::string(e.what());
-		std::cerr << error_msg << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
+    return app.run();
 }

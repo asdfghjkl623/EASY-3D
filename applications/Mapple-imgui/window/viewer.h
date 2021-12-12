@@ -24,39 +24,69 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  ********************************************************************/
 
-#ifndef EASY3D_PLUGIN_H
-#define EASY3D_PLUGIN_H
+#ifndef EASY3D_TUTORIAL_IMGUI_VIEWER_H
+#define EASY3D_TUTORIAL_IMGUI_VIEWER_H
 
-#include <string>
-#include <vector>
+
+#include <easy3d/viewer/viewer.h>
+
+
+
+// A very good tutorial for imgui:
+// https://eliasdaler.github.io/using-imgui-with-sfml-pt1/
+// https://eliasdaler.github.io/using-imgui-with-sfml-pt2/
+
+
+struct ImGuiContext;
 
 
 namespace easy3d {
 
-	// Abstract class for plugins. 
-	// A plugin typically implements some methods. It may contain several GUI 
-	// elements (e.g., buttons for executing commands, input boxes for methods 
-	// or rendering parameters) and is always attached to a panel.
+    class Panel;
 
-	class Panel;
-
-	class Plugin
+    class ViewerImGui : public Viewer
 	{
 	public:
-		Plugin(Panel * panel, const std::string& name);
-        virtual ~Plugin();
+        ViewerImGui(
+            const std::string& title = "Easy3D ImGui Viewer",
+			int samples = 4,
+			int gl_major = 3,
+			int gl_minor = 2
+		);
 
-	public:
-        virtual bool draw() const = 0;
-		virtual void cleanup() { }
+        bool add_panel(Panel* panel);
 
 	protected:
-		Panel*		panel_;
-		std::string	name_;
+
+		// imgui plugins
+		void init() override;
+
+		// draw the widgets
+		void pre_draw() override;
+
+		//  the widgets
+		void post_draw() override;
+
+		void cleanup() override;
+
+		void post_resize(int w, int h) override;
+
+		bool callback_event_cursor_pos(double x, double y) override;
+		bool callback_event_mouse_button(int button, int action, int modifiers) override;
+		bool callback_event_keyboard(int key, int action, int modifiers) override;
+		bool callback_event_character(unsigned int codepoint) override;
+		bool callback_event_scroll(double dx, double dy) override;
+
+	protected:
+		// Single global context by default, but can be overridden by the user
+		static ImGuiContext *	context_;
+
+        // List of registered windows
+        std::vector<Panel*>	panels_;
 
         friend class Panel;
 	};
 
 }
 
-#endif	// EASY3D_PLUGIN_H
+#endif	// EASY3D_TUTORIAL_IMGUI_VIEWER_H
