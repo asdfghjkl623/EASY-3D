@@ -1,4 +1,0 @@
-http://kgeorge.github.io/2014/03/08/calculating-opengl-perspective-matrix-from-opencv-intrinsic-matrix
-
-https://github.com/CarloNicolini/OpenGL-CameraCalibration
-
