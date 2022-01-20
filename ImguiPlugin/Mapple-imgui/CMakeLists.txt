@@ -5,13 +5,13 @@ project(${PROJECT_NAME})
 
 
 set(${PROJECT_NAME}_HEADERS
-        ./plugin_polyfit.h
-    )
+        plugin_polyfit.h
+        )
 
 set(${PROJECT_NAME}_SOURCES
-    ./main.cpp
-        ./plugin_polyfit.cpp
-    )
+        main.cpp
+        plugin_polyfit.cpp
+        )
 
 add_executable(${PROJECT_NAME} ${${PROJECT_NAME}_SOURCES} ${${PROJECT_NAME}_HEADERS})
 
